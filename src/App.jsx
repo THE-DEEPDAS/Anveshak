@@ -7,6 +7,8 @@ import HomePage from "./pages/HomePage";
 import OnboardingPage from "./pages/OnboardingPage";
 import DashboardPage from "./pages/DashboardPage";
 import EmailsPage from "./pages/EmailsPage";
+import ProtectedRoute from "./components/layout/ProtectedRoute";
+import LandingPage from "./pages/LandingPage";
 import { AppProvider } from "./context/AppContext";
 
 function App() {
@@ -18,8 +20,22 @@ function App() {
           <main className="flex-grow">
             <Routes>
               <Route path="/" element={<HomePage />} />
-              <Route path="/onboarding" element={<OnboardingPage />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route
+                path="/onboarding"
+                element={
+                  <ProtectedRoute>
+                    <OnboardingPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <DashboardPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/emails" element={<EmailsPage />} />
             </Routes>
           </main>
