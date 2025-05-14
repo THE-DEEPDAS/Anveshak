@@ -55,6 +55,7 @@ axios.interceptors.response.use(
       }
     }
 
+    // If the error is not 401 or refresh fails, reject the promise
     return Promise.reject(error);
   }
 );

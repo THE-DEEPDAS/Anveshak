@@ -4,12 +4,14 @@ import { FaUserCircle, FaChevronDown } from "react-icons/fa";
 import { useAppContext } from "../../context/AppContext";
 import { logout } from "../../services/authService";
 import AnveshakLogo from "../../components/assets/Anveshak.jpg";
+import axios from "axios";
 
 const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAppContext();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [resume, setResume] = useState(null);
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -22,6 +24,15 @@ const Navbar = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      // Correct the API endpoint
+      axios.get(`/api/resumes/user/${user.id}/has-resume`).then((response) => {
+        setResume(response.data.hasResume ? { id: "exists" } : null);
+      });
+    }
+  }, [user]);
 
   const handleLogout = async () => {
     try {
@@ -82,13 +93,15 @@ const Navbar = () => {
               <p className="text-xs text-gray-600">{user.email}</p>
             </div>
 
-            <Link
-              to="/dashboard"
-              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-              onClick={() => setShowProfileMenu(false)}
-            >
-              Dashboard
-            </Link>
+            {resume && (
+              <Link
+                to="/dashboard"
+                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                onClick={() => setShowProfileMenu(false)}
+              >
+                Dashboard
+              </Link>
+            )}
 
             <button
               onClick={() => {
@@ -128,6 +141,18 @@ const Navbar = () => {
           >
             Home
           </Link>
+          {resume && (
+            <Link
+              to="/dashboard"
+              className={`text-sm font-medium ${
+                location.pathname === "/dashboard"
+                  ? "text-blue-600"
+                  : "text-gray-600 hover:text-blue-600 transition-colors"
+              }`}
+            >
+              Dashboard
+            </Link>
+          )}
           {renderAuthLinks()}
           {renderProfileMenu()}
         </nav>

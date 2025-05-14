@@ -14,10 +14,10 @@ export const verifyEmailLimiter = rateLimit({
   },
 });
 
-// General API rate limiter
+// Increase the general API rate limit to allow more requests during debugging
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 500, // Temporarily increase to 500 requests per windowMs
   message: { message: "Too many requests, please try again later." },
   standardHeaders: true,
   legacyHeaders: false,

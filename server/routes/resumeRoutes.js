@@ -77,12 +77,10 @@ router.post("/upload", upload.single("resume"), async (req, res) => {
         console.error("Error creating user:", userError);
         if (userError.code === 11000) {
           // Duplicate key error
-          return res
-            .status(409)
-            .json({
-              message:
-                "Email already exists. Please log in or use a different email.",
-            });
+          return res.status(409).json({
+            message:
+              "Email already exists. Please log in or use a different email.",
+          });
         }
         throw userError;
       }
@@ -157,6 +155,17 @@ router.get("/user/:userId", async (req, res) => {
     res.status(200).json(resumes);
   } catch (error) {
     console.error("Error fetching user resumes:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Add a route to check if a user has uploaded a resume
+router.get("/user/:userId/has-resume", async (req, res) => {
+  try {
+    const resumeExists = await Resume.exists({ user: req.params.userId });
+    res.status(200).json({ hasResume: !!resumeExists });
+  } catch (error) {
+    console.error("Error checking resume existence:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
