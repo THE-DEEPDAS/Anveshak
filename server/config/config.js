@@ -9,28 +9,51 @@ const __dirname = dirname(__filename);
 // Load environment variables from the root .env file
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
-// Validate required environment variables
-const requiredEnvVars = {
-  EMAIL_HOST: process.env.EMAIL_HOST,
-  EMAIL_USER: process.env.EMAIL_USER,
-  EMAIL_PASS: process.env.EMAIL_PASS,
-  EMAIL_PORT: process.env.EMAIL_PORT,
-  EMAIL_SECURE: process.env.EMAIL_SECURE,
-  MONGODB_URI: process.env.MONGODB_URI,
-  FRONTEND_URL: process.env.FRONTEND_URL,
-  JWT_SECRET: process.env.JWT_SECRET,
+// Validate required configurations
+const validateConfig = () => {
+  const requiredEnvVars = [
+    "MONGODB_URI",
+    "JWT_SECRET",
+    [
+      "CLOUDINARY_URL",
+      ["CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET"],
+    ],
+  ];
+
+  for (const envVar of requiredEnvVars) {
+    if (Array.isArray(envVar)) {
+      // Check if either the main variable or all alternatives are set
+      const [mainVar, alternatives] = envVar;
+      const mainVarExists = process.env[mainVar];
+      const allAlternativesExist = alternatives.every(
+        (alt) => process.env[alt]
+      );
+
+      if (!mainVarExists && !allAlternativesExist) {
+        console.error(
+          `Missing required configuration: ${mainVar} or all of [${alternatives.join(
+            ", "
+          )}]`
+        );
+        if (process.env.NODE_ENV === "production") {
+          throw new Error(
+            `Missing required configuration: ${mainVar} or alternatives`
+          );
+        }
+      }
+      continue;
+    }
+
+    if (!process.env[envVar]) {
+      console.error(`Missing required configuration: ${envVar}`);
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(`Missing required configuration: ${envVar}`);
+      }
+    }
+  }
 };
 
-// Check for missing environment variables
-const missingVars = Object.entries(requiredEnvVars)
-  .filter(([_, value]) => !value)
-  .map(([key]) => key);
-
-if (missingVars.length > 0) {
-  throw new Error(
-    `Missing required environment variables: ${missingVars.join(", ")}`
-  );
-}
+validateConfig();
 
 // Cookie settings
 const cookieConfig = {
@@ -71,6 +94,12 @@ export const config = {
   jwt: {
     secret: process.env.JWT_SECRET,
     expiresIn: "30d",
+  },
+  cloudinary: {
+    url: process.env.CLOUDINARY_URL,
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    apiSecret: process.env.CLOUDINARY_API_SECRET,
   },
   cookie: cookieConfig,
   cors: corsConfig,

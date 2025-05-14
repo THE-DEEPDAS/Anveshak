@@ -7,62 +7,150 @@ import {
   getProjectsFromText,
 } from "./aiService.js";
 import { v2 as cloudinary } from "cloudinary";
-import https from "https";
-import { config } from "../config/config.js";
+import axios from "axios";
 
 // Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+const configureCloudinary = () => {
+  // Check for individual environment variables first
+  if (
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+  ) {
+    return cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+      secure: true,
+    });
+  }
+
+  // Fall back to CLOUDINARY_URL if individual vars aren't set
+  if (!process.env.CLOUDINARY_URL) {
+    console.error(
+      "Cloudinary configuration is missing. Please set CLOUDINARY_URL or individual credentials."
+    );
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Cloudinary configuration is required");
+    }
+    return null;
+  }
+
+  try {
+    // Parse CLOUDINARY_URL (format: cloudinary://api_key:api_secret@cloud_name)
+    const cloudinaryUrl = process.env.CLOUDINARY_URL;
+    const match = cloudinaryUrl.match(/cloudinary:\/\/([^:]+):([^@]+)@(.+)/);
+
+    if (!match) {
+      throw new Error("Invalid CLOUDINARY_URL format");
+    }
+
+    const [_, apiKey, apiSecret, cloudName] = match;
+
+    return cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+      secure: true,
+    });
+  } catch (error) {
+    console.error("Error configuring Cloudinary:", error.message);
+    if (process.env.NODE_ENV === "production") {
+      throw error;
+    }
+    return null;
+  }
+};
+
+// Initialize Cloudinary configuration
+configureCloudinary();
 
 export const parseResumeText = async (
   cloudinaryUrl,
   previousVersion = null
 ) => {
+  let dataBuffer = null;
+
   try {
-    // Get secure URL from Cloudinary
-    const secureUrl = cloudinaryUrl.startsWith("http")
-      ? cloudinaryUrl
-      : cloudinary.url(cloudinaryUrl, {
-          secure: true,
-          resource_type: "raw",
-          sign_url: true, // Add signature to URL
-        });
+    // Ensure we have a valid Cloudinary URL
+    if (!cloudinaryUrl) {
+      throw new Error("Cloudinary URL is required");
+    }
 
-    // Download file from Cloudinary with auth headers
-    const dataBuffer = await new Promise((resolve, reject) => {
-      const options = {
-        headers: {
-          Authorization: `Basic ${Buffer.from(
-            process.env.CLOUDINARY_API_KEY +
-              ":" +
-              process.env.CLOUDINARY_API_SECRET
-          ).toString("base64")}`,
-        },
-      };
+    // Extract public ID from URL if it's a full Cloudinary URL
+    let publicId;
+    if (cloudinaryUrl.includes("cloudinary.com")) {
+      const urlParts = cloudinaryUrl.split("/");
+      publicId = urlParts
+        .slice(urlParts.indexOf("upload") + 1)
+        .join("/")
+        .split(".")[0];
+    } else {
+      publicId = cloudinaryUrl;
+    }
 
-      https
-        .get(secureUrl, options, (response) => {
-          if (response.statusCode !== 200) {
-            reject(
-              new Error(
-                `Failed to fetch file from Cloudinary: ${response.statusCode} ${response.statusMessage}`
-              )
-            );
-            return;
-          }
+    // Check if Cloudinary is configured
+    if (!cloudinary.config().api_key) {
+      throw new Error("Cloudinary is not properly configured");
+    }
 
-          const chunks = [];
-          response.on("data", (chunk) => chunks.push(chunk));
-          response.on("end", () => resolve(Buffer.concat(chunks)));
-          response.on("error", reject);
-        })
-        .on("error", reject);
+    // Generate signed URL with authentication
+    const timestamp = Math.floor(Date.now() / 1000);
+    const signature = cloudinary.utils.api_sign_request(
+      {
+        public_id: publicId,
+        timestamp: timestamp,
+        resource_type: "raw",
+        type: "private",
+      },
+      cloudinary.config().api_secret
+    );
+
+    // Create authenticated URL
+    const downloadUrl = cloudinary.url(publicId, {
+      resource_type: "raw",
+      type: "private",
+      timestamp: timestamp,
+      signature: signature,
+      api_key: cloudinary.config().api_key,
+      secure: true,
     });
 
+    // Download file from Cloudinary using axios
+    try {
+      const response = await axios({
+        method: "get",
+        url: downloadUrl,
+        responseType: "arraybuffer",
+        headers: {
+          "User-Agent": "Cold-Mailer-App/1.0",
+        },
+      });
+
+      if (!response.data) {
+        throw new Error("No data received from Cloudinary");
+      }
+
+      dataBuffer = Buffer.from(response.data);
+    } catch (downloadError) {
+      console.error(
+        "Error downloading from Cloudinary:",
+        downloadError.message
+      );
+      if (downloadError.response) {
+        console.error("Response status:", downloadError.response.status);
+        console.error("Response headers:", downloadError.response.headers);
+      }
+      throw new Error(
+        `Failed to download file from Cloudinary: ${downloadError.message}`
+      );
+    }
+
     // Parse PDF
+    if (!dataBuffer || dataBuffer.length === 0) {
+      throw new Error("Invalid PDF data received");
+    }
+
     const data = await pdfParse(dataBuffer);
 
     if (!data || !data.text || data.text.trim().length === 0) {
@@ -70,27 +158,6 @@ export const parseResumeText = async (
     }
 
     const text = data.text;
-
-    // Only use mock data in development if no GEMINI_API_KEY AND text parsing failed
-    if (!process.env.GEMINI_API_KEY) {
-      console.warn("Warning: GEMINI_API_KEY not set");
-      try {
-        // Try basic text parsing before falling back to mock data
-        const parsedData = await parseTextWithoutAI(text);
-        if (
-          parsedData.skills.length > 0 ||
-          parsedData.experience.length > 0 ||
-          parsedData.projects.length > 0
-        ) {
-          console.log("Successfully parsed resume without AI");
-          return parsedData;
-        }
-      } catch (parseError) {
-        console.error("Basic parsing failed:", parseError);
-      }
-      console.log("Falling back to mock data");
-      return getMockResumeData();
-    }
 
     // Extract information using AI with previous context if available
     const [skills, experience, projects] = await Promise.all([
@@ -101,7 +168,7 @@ export const parseResumeText = async (
 
     // Validate the parsed data
     if (!skills?.length && !experience?.length && !projects?.length) {
-      throw new Error("AI parsing returned no data");
+      throw new Error("No relevant content extracted from PDF");
     }
 
     const parseResult = {
@@ -115,26 +182,31 @@ export const parseResumeText = async (
   } catch (error) {
     console.error("Resume parsing error:", error);
 
-    // In production, fail if parsing fails
+    // In production, fail on parsing errors
     if (process.env.NODE_ENV === "production") {
       throw new Error("Resume parsing failed: " + error.message);
     }
 
-    // In development, try basic parsing before using mock data
-    try {
-      const text = await pdfParse(dataBuffer);
-      const parsedData = await parseTextWithoutAI(text.text);
-      if (
-        parsedData.skills.length > 0 ||
-        parsedData.experience.length > 0 ||
-        parsedData.projects.length > 0
-      ) {
-        return parsedData;
+    // In development, try basic parsing if we have the data buffer
+    if (dataBuffer) {
+      try {
+        console.log("Attempting basic parsing...");
+        const text = await pdfParse(dataBuffer);
+        const parsedData = await parseTextWithoutAI(text.text);
+        if (
+          parsedData.skills.length > 0 ||
+          parsedData.experience.length > 0 ||
+          parsedData.projects.length > 0
+        ) {
+          console.log("Successfully parsed resume using basic parsing");
+          return parsedData;
+        }
+      } catch (parseError) {
+        console.error("Basic parsing failed:", parseError);
       }
-    } catch (parseError) {
-      console.error("Basic parsing failed:", parseError);
     }
 
+    console.warn("Falling back to mock data for development");
     return getMockResumeData();
   }
 };

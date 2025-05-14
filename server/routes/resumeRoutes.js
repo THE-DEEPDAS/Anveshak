@@ -12,7 +12,7 @@ import { parseResumeText } from "../services/resumeParser.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Configure Cloudinary with explicit authentication
+// Configure Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -30,7 +30,12 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    cb(null, Date.now() + "-" + file.originalname);
+    // Clean filename and ensure PDF extension
+    const cleanName = file.originalname
+      .replace(/[^a-zA-Z0-9]/g, "-")
+      .toLowerCase();
+    const timestamp = Date.now();
+    cb(null, `${timestamp}-${cleanName}`);
   },
 });
 
@@ -38,7 +43,6 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: function (req, file, cb) {
-    // Accept only PDF files
     if (file.mimetype !== "application/pdf") {
       return cb(new Error("Only PDF files are allowed"));
     }
@@ -50,47 +54,41 @@ const router = express.Router();
 
 // Upload and process resume
 router.post("/upload", upload.single("resume"), async (req, res) => {
+  let uploadedFile = null;
+
   try {
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
+    uploadedFile = req.file;
 
-    // Get user info from request
     const { name, email, replace, previousResumeId } = req.body;
 
     if (!name || !email) {
-      return res.status(400).json({ message: "Name and email are required" });
+      throw new Error("Name and email are required");
     }
 
     // Create or find user
     let user = await User.findOne({ email });
-
     if (!user) {
-      user = new User({
-        name,
-        email,
-        isVerified: false,
-      });
+      user = new User({ name, email, isVerified: false });
       try {
         await user.save();
       } catch (userError) {
-        console.error("Error creating user:", userError);
         if (userError.code === 11000) {
-          return res.status(409).json({
-            message:
-              "Email already exists. Please log in or use a different email.",
-          });
+          throw new Error(
+            "Email already exists. Please log in or use a different email."
+          );
         }
         throw userError;
       }
     }
 
-    // If replacing existing resume, delete old one from Cloudinary
+    // Handle existing resume replacement
     if (replace && previousResumeId) {
       const oldResume = await Resume.findById(previousResumeId);
       if (oldResume) {
         try {
-          // Extract public_id from Cloudinary URL
           const publicId = oldResume.cloudinaryUrl
             .split("/")
             .slice(-2)
@@ -102,36 +100,46 @@ router.post("/upload", upload.single("resume"), async (req, res) => {
           });
         } catch (deleteError) {
           console.error("Error deleting old resume:", deleteError);
-          // Continue with upload even if delete fails
         }
       }
     }
 
-    // Upload file to Cloudinary with proper access settings
-    const result = await cloudinary.uploader.upload(req.file.path, {
+    // Upload to Cloudinary with enhanced settings
+    const folderPath = `resumes/${user._id}`;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const uploadResult = await cloudinary.uploader.upload(req.file.path, {
       resource_type: "raw",
-      public_id: `resumes/${user._id}/${path.basename(
-        req.file.filename,
-        ".pdf"
-      )}`,
-      tags: ["resume"],
-      access_mode: "authenticated",
+      folder: folderPath,
+      public_id: path.basename(req.file.filename, ".pdf"),
       type: "private",
+      access_mode: "authenticated",
+      timestamp: timestamp,
       use_filename: true,
       unique_filename: true,
+      format: "pdf",
+      overwrite: true,
+      invalidate: true,
     });
 
-    // Parse resume text using Cloudinary URL
-    const resumeData = await parseResumeText(result.secure_url);
+    if (!uploadResult?.secure_url) {
+      throw new Error("Failed to upload file to Cloudinary");
+    }
 
-    // Validate parsed data
+    // Parse resume with enhanced error handling
+    let resumeData;
+    try {
+      resumeData = await parseResumeText(uploadResult.secure_url);
+    } catch (parseError) {
+      throw new Error(`Resume parsing failed: ${parseError.message}`);
+    }
+
     if (
       !resumeData ||
       (!resumeData.skills?.length &&
         !resumeData.experience?.length &&
         !resumeData.projects?.length)
     ) {
-      throw new Error("Failed to parse resume content");
+      throw new Error("Failed to extract content from resume");
     }
 
     // Create or update resume record
@@ -142,7 +150,7 @@ router.post("/upload", upload.single("resume"), async (req, res) => {
         {
           filename: req.file.filename,
           originalFilename: req.file.originalname,
-          cloudinaryUrl: result.secure_url,
+          cloudinaryUrl: uploadResult.secure_url,
           skills: resumeData.skills,
           experience: resumeData.experience,
           projects: resumeData.projects,
@@ -156,7 +164,7 @@ router.post("/upload", upload.single("resume"), async (req, res) => {
         user: user._id,
         filename: req.file.filename,
         originalFilename: req.file.originalname,
-        cloudinaryUrl: result.secure_url,
+        cloudinaryUrl: uploadResult.secure_url,
         skills: resumeData.skills,
         experience: resumeData.experience,
         projects: resumeData.projects,
@@ -166,13 +174,15 @@ router.post("/upload", upload.single("resume"), async (req, res) => {
     }
 
     // Clean up local file
-    fs.unlinkSync(req.file.path);
+    if (fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
 
     res.status(200).json({
       message: "Resume uploaded successfully",
       resumeId: resume._id,
       userId: user._id,
-      url: result.secure_url,
+      url: uploadResult.secure_url,
       skills: resumeData.skills,
       experience: resumeData.experience,
       projects: resumeData.projects,
@@ -181,14 +191,15 @@ router.post("/upload", upload.single("resume"), async (req, res) => {
     console.error("Error uploading resume:", error);
 
     // Clean up local file if it exists
-    if (req.file?.path && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+    if (uploadedFile?.path && fs.existsSync(uploadedFile.path)) {
+      fs.unlinkSync(uploadedFile.path);
     }
 
-    res.status(500).json({
-      message: "Server error while uploading resume",
-      error: error.message,
-    });
+    res
+      .status(error.message.includes("Email already exists") ? 409 : 500)
+      .json({
+        message: error.message || "Server error while uploading resume",
+      });
   }
 });
 
