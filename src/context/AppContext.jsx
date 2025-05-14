@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { getCurrentUser } from "../services/authService";
+import { useNavigate } from "react-router-dom";
 
 const AppContext = createContext();
 
@@ -7,9 +8,13 @@ export const useAppContext = () => useContext(AppContext);
 
 export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [resume, setResume] = useState(null);
+  const [resume, setResume] = useState(() => {
+    const stored = localStorage.getItem("resume");
+    return stored ? JSON.parse(stored) : null;
+  });
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -20,13 +25,18 @@ export const AppProvider = ({ children }) => {
         }
       } catch (error) {
         console.error("Error initializing auth:", error);
+        if (
+          !PUBLIC_ROUTES.some((route) => location.pathname.startsWith(route))
+        ) {
+          window.location.href = "/login";
+        }
       } finally {
         setLoading(false);
       }
     };
 
     initializeAuth();
-  }, []);
+  }, [location.pathname]);
 
   const contextValue = {
     user,
@@ -36,7 +46,6 @@ export const AppProvider = ({ children }) => {
     emails,
     setEmails,
     loading,
-    setLoading,
   };
 
   if (loading) {

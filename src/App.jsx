@@ -24,9 +24,10 @@ const router = {
 
 function App() {
   return (
-    <AppProvider>
+    
       <ToastProvider>
-        <Router {...router}>
+      <Router {...router}>
+      <AppProvider>
           <div className="flex flex-col min-h-screen bg-gray-50">
             <Navbar />
             <main className="flex-grow">
@@ -57,9 +58,10 @@ function App() {
             <Footer />
             <Toaster />
           </div>
+          </AppProvider>
         </Router>
       </ToastProvider>
-    </AppProvider>
+    
   );
 }
 
