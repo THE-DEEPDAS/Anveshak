@@ -23,16 +23,26 @@ const EmailGenerator = () => {
   // Validate resume before operations
   const validateResume = () => {
     if (!resume) {
-      throw new Error("Resume is required");
+      throw new Error("Please upload your resume first");
     }
     if (!resume.id) {
-      throw new Error("Invalid resume ID");
+      throw new Error(
+        "Resume data is incomplete. Please try reuploading your resume"
+      );
     }
-    if (!resume.skills?.length) {
-      throw new Error("No skills found in resume");
+    if (!resume.url) {
+      throw new Error(
+        "Resume file is not accessible. Please try reuploading your resume"
+      );
     }
-    if (!resume.projects?.length) {
-      throw new Error("No projects found in resume");
+    if (
+      !resume.skills?.length &&
+      !resume.experience?.length &&
+      !resume.projects?.length
+    ) {
+      throw new Error(
+        "Resume parsing is incomplete. Please wait a moment and try again"
+      );
     }
   };
 
@@ -43,9 +53,14 @@ const EmailGenerator = () => {
       validateResume();
       const response = await generateEmails(resume.id, {
         action: "find-companies",
+        skills: resume.skills,
+        experience: resume.experience,
+        projects: resume.projects,
       });
       if (!response.companies?.length) {
-        throw new Error("No matching companies found");
+        throw new Error(
+          "No matching companies found. Try updating your resume with more details about your skills and experience."
+        );
       }
       setCompanies(response.companies);
       setStep("select-companies");

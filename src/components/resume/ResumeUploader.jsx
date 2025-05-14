@@ -10,110 +10,112 @@ import { useToast } from "../../components/ui/Toaster";
 const ResumeUploader = () => {
   const { user, resume, setResume } = useAppContext();
   const [isUploading, setIsUploading] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
   const { showToast } = useToast();
 
   useEffect(() => {
-    if (resume?.id) {
-      getResumeById(resume.id)
-        .then((data) => {
-          if (
-            data.skills?.length ||
-            data.experience?.length ||
-            data.projects?.length
-          ) {
+    if (resume?.id && resume.parseStatus === "pending") {
+      setIsParsing(true);
+      const pollInterval = setInterval(async () => {
+        try {
+          const data = await getResumeById(resume.id);
+          if (data.parseStatus === "completed") {
+            clearInterval(pollInterval);
+            setIsParsing(false);
             setResume({
               ...resume,
-              skills: data.skills,
-              experience: data.experience,
-              projects: data.projects,
+              ...data,
+              skills: data.skills || [],
+              experience: data.experience || [],
+              projects: data.projects || [],
             });
-          } else {
-            showToast("Resume parsing in progress, please wait...", "info");
-            // Poll for parsed data
-            const pollInterval = setInterval(async () => {
-              try {
-                const updatedData = await getResumeById(resume.id);
-                if (
-                  updatedData.skills?.length ||
-                  updatedData.experience?.length ||
-                  updatedData.projects?.length
-                ) {
-                  clearInterval(pollInterval);
-                  setResume({
-                    ...resume,
-                    skills: updatedData.skills,
-                    experience: updatedData.experience,
-                    projects: updatedData.projects,
-                  });
-                  showToast("Resume parsed successfully!", "success");
-                }
-              } catch (err) {
-                console.error("Error polling resume data:", err);
-              }
-            }, 5000); // Poll every 5 seconds
-
-            // Clean up interval after 2 minutes (24 attempts)
-            setTimeout(() => {
-              clearInterval(pollInterval);
-              if (!resume.skills?.length) {
-                showToast(
-                  "Resume parsing taking longer than expected. Please try again.",
-                  "error"
-                );
-              }
-            }, 120000);
-
-            return () => clearInterval(pollInterval);
+            showToast("Resume parsed successfully!", "success");
+          } else if (data.parseStatus === "failed") {
+            clearInterval(pollInterval);
+            setIsParsing(false);
+            setError(data.parseError?.message || "Failed to parse resume");
+            showToast(
+              data.parseError?.message || "Failed to parse resume",
+              "error"
+            );
           }
-        })
-        .catch((err) => {
-          console.error("Error fetching resume details:", err);
-          setError("Failed to load resume details");
-          showToast("Error loading resume details", "error");
-        });
+        } catch (err) {
+          console.error("Error polling resume data:", err);
+        }
+      }, 5000); // Poll every 5 seconds
+
+      // Clean up interval after 2 minutes
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        if (isParsing) {
+          setIsParsing(false);
+          setError("Resume parsing timed out. Please try uploading again.");
+          showToast(
+            "Resume parsing timed out. Please try uploading again.",
+            "error"
+          );
+        }
+      }, 120000);
+
+      return () => clearInterval(pollInterval);
     }
-  }, [resume?.id, setResume, showToast]);
+  }, [resume?.id, resume?.parseStatus, setResume, showToast]);
 
   const handleUpload = async (file) => {
     if (!file) return;
+
+    // Validate file type and size
+    if (file.type !== "application/pdf") {
+      showToast("Only PDF files are allowed", "error");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("File size must be less than 5MB", "error");
+      return;
+    }
 
     const formData = new FormData();
     formData.append("resume", file);
     formData.append("name", user.name);
     formData.append("email", user.email);
 
-    // If there's an existing resume, add a flag to indicate replacement
-    if (resume?.id) {
-      formData.append("replace", "true");
-      formData.append("previousResumeId", resume.id);
-    }
-
     setIsUploading(true);
     setError(null);
 
     try {
       const response = await uploadResume(formData);
+
       setResume({
         id: response.resumeId,
-        url: response.url,
-        skills: response.skills,
-        experience: response.experience,
-        projects: response.projects,
+        url: response.resume.url,
+        parseStatus: response.resume.parseStatus,
+        skills: response.resume.skills || [],
+        experience: response.resume.experience || [],
+        projects: response.resume.projects || [],
       });
-      showToast("Resume uploaded successfully!", "success");
+
+      if (response.resume.parseStatus === "failed") {
+        setError(response.parsingError || "Failed to parse resume");
+        showToast(response.parsingError || "Failed to parse resume", "error");
+      } else if (response.resume.parseStatus === "pending") {
+        showToast("Resume uploaded, parsing in progress...", "info");
+        setIsParsing(true);
+      } else {
+        showToast("Resume uploaded and parsed successfully!", "success");
+      }
+
       navigate("/dashboard");
     } catch (error) {
       console.error("Error uploading resume:", error);
-      setError(
+      const errorMessage =
         error.response?.data?.message ||
-          "Failed to upload resume. Please try again."
-      );
-      showToast(
-        error.response?.data?.message || "Failed to upload resume",
-        "error"
-      );
+        error.message ||
+        "Failed to upload resume";
+      setError(errorMessage);
+      showToast(errorMessage, "error");
     } finally {
       setIsUploading(false);
     }
@@ -132,6 +134,12 @@ const ResumeUploader = () => {
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-600 hover:text-blue-700 underline"
+              onClick={(e) => {
+                if (!resume.url) {
+                  e.preventDefault();
+                  showToast("Resume URL is not available", "error");
+                }
+              }}
             >
               View Current Resume
             </a>
@@ -146,6 +154,7 @@ const ResumeUploader = () => {
               accept=".pdf"
               maxSize={5}
               label="Upload a new resume to replace the current one (PDF only, max 5MB)"
+              disabled={isUploading || isParsing}
             />
           </div>
         </div>
@@ -164,6 +173,7 @@ const ResumeUploader = () => {
           accept=".pdf"
           maxSize={5}
           label="Upload your resume (PDF only, max 5MB)"
+          disabled={isUploading || isParsing}
         />
 
         {error && (
@@ -172,10 +182,12 @@ const ResumeUploader = () => {
           </div>
         )}
 
-        {isUploading && (
+        {(isUploading || isParsing) && (
           <div className="flex items-center justify-center py-4">
             <FaSpinner className="animate-spin h-6 w-6 text-blue-600" />
-            <span className="ml-2 text-gray-600">Uploading resume...</span>
+            <span className="ml-2 text-gray-600">
+              {isUploading ? "Uploading resume..." : "Parsing resume..."}
+            </span>
           </div>
         )}
       </div>

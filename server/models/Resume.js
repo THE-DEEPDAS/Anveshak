@@ -1,86 +1,98 @@
 import mongoose from "mongoose";
 
 const parseResultSchema = new mongoose.Schema({
-  skills: [
-    {
-      type: String,
-      trim: true,
-    },
-  ],
-  experience: [
-    {
-      type: String,
-      trim: true,
-    },
-  ],
-  projects: [
-    {
-      type: String,
-      trim: true,
-    },
-  ],
-  parsedAt: {
-    type: Date,
-    default: Date.now,
-  },
+  skills: [{ type: String, trim: true }],
+  experience: [{ type: String, trim: true }],
+  projects: [{ type: String, trim: true }],
+  parsedAt: { type: Date, default: Date.now },
 });
 
-const resumeSchema = new mongoose.Schema({
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true,
-  },
-  filename: {
-    type: String,
-    required: true,
-  },
-  originalFilename: {
-    type: String,
-    required: true,
-  },
-  cloudinaryUrl: {
-    type: String,
-    required: true,
-  },
-  currentVersion: {
-    type: Number,
-    default: 1,
-  },
-  parseHistory: [parseResultSchema],
-  skills: [
-    {
-      type: String,
-      trim: true,
+const resumeSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
     },
-  ],
-  experience: [
-    {
+    filename: {
       type: String,
-      trim: true,
+      required: true,
     },
-  ],
-  projects: [
-    {
+    originalFilename: {
       type: String,
-      trim: true,
+      required: true,
     },
-  ],
-  createdAt: {
-    type: Date,
-    default: Date.now,
+    cloudinaryPublicId: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    cloudinaryUrl: {
+      type: String,
+      required: true,
+    },
+    skills: [{ type: String, trim: true }],
+    experience: [{ type: String, trim: true }],
+    projects: [{ type: String, trim: true }],
+    parseHistory: [parseResultSchema],
+    currentVersion: {
+      type: Number,
+      default: 1,
+    },
+    lastParseAttempt: {
+      type: Date,
+      default: Date.now,
+    },
+    parseStatus: {
+      type: String,
+      enum: ["pending", "completed", "failed"],
+      default: "pending",
+    },
+    parseError: {
+      message: String,
+      timestamp: Date,
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+    updatedAt: {
+      type: Date,
+      default: Date.now,
+    },
   },
-  updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+  {
+    timestamps: true,
+  }
+);
 
-// Update the updatedAt field before saving
-resumeSchema.pre("save", function (next) {
-  this.updatedAt = Date.now();
-  next();
-});
+// Indexes for better query performance
+resumeSchema.index({ user: 1, createdAt: -1 });
+resumeSchema.index({ cloudinaryPublicId: 1 }, { unique: true });
+
+// Method to update parse results
+resumeSchema.methods.updateParseResults = function (parseResults) {
+  this.skills = parseResults.skills;
+  this.experience = parseResults.experience;
+  this.projects = parseResults.projects;
+  this.parseHistory.push(parseResults);
+  this.currentVersion += 1;
+  this.parseStatus = "completed";
+  this.lastParseAttempt = new Date();
+  return this.save();
+};
+
+// Method to mark parsing as failed
+resumeSchema.methods.markParseFailed = function (error) {
+  this.parseStatus = "failed";
+  this.parseError = {
+    message: error.message,
+    timestamp: new Date(),
+  };
+  this.lastParseAttempt = new Date();
+  return this.save();
+};
 
 const Resume = mongoose.model("Resume", resumeSchema);
 

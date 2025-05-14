@@ -66,6 +66,30 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+// Cleanup old files from uploads directory
+const cleanupUploads = () => {
+  try {
+    const files = fs.readdirSync(uploadsDir);
+    const now = Date.now();
+    files.forEach((file) => {
+      const filePath = path.join(uploadsDir, file);
+      const stats = fs.statSync(filePath);
+      // Remove files older than 1 hour
+      if (now - stats.mtimeMs > 60 * 60 * 1000) {
+        fs.unlinkSync(filePath);
+        console.log(`Cleaned up old upload: ${file}`);
+      }
+    });
+  } catch (error) {
+    console.error("Error cleaning up uploads:", error);
+  }
+};
+
+// Run cleanup every hour
+setInterval(cleanupUploads, 60 * 60 * 1000);
+// Run cleanup on startup
+cleanupUploads();
+
 // Trust proxy if in production
 if (config.server.nodeEnv === "production") {
   app.set("trust proxy", 1);

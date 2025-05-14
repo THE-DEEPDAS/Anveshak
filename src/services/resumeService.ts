@@ -1,30 +1,47 @@
-import axios from 'axios';
+import { api } from '../config/api';
 
-const API_URL = 'http://localhost:5000/api';
+export async function uploadResume(file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append("resume", file);
 
-export const uploadResume = async (formData: FormData) => {
   try {
-    const response = await axios.post(`${API_URL}/resumes/upload`, formData, {
+    const response = await api.post("/api/resume/upload", formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
+        "Content-Type": "multipart/form-data",
       },
     });
+
     return response.data;
   } catch (error) {
-    console.error('Error uploading resume:', error);
+    console.error("Error uploading resume:", error);
     throw error;
   }
-};
+}
 
-export const getResumeById = async (resumeId: string) => {
+export async function getResumeById(resumeId: string) {
   try {
-    const response = await axios.get(`${API_URL}/resumes/${resumeId}`);
+    const response = await api.get(`/api/resume/${resumeId}`);
     return response.data;
   } catch (error) {
     console.error('Error fetching resume:', error);
     throw error;
   }
-};
+}
+
+export async function getResumeData(publicId: string): Promise<ArrayBuffer> {
+  try {
+    const response = await api.get(`/api/resume/download/${encodeURIComponent(publicId)}`, {
+      responseType: 'arraybuffer',
+      headers: {
+        'Accept': 'application/pdf'
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error downloading resume:", error);
+    throw error;
+  }
+}
 
 // Mock function for development
 export const getMockResumeData = () => {

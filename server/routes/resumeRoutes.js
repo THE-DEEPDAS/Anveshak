@@ -7,7 +7,8 @@ import User from "../models/User.js";
 import Resume from "../models/Resume.js";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
-import { parseResumeText } from "../services/resumeParser.js";
+import { parseResumeText, generatePdfUrl } from "../services/resumeParser.js";
+import { authenticateToken } from "../middleware/auth.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -30,212 +31,164 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    // Clean filename and ensure PDF extension
-    const cleanName = file.originalname
-      .replace(/[^a-zA-Z0-9]/g, "-")
-      .toLowerCase();
-    const timestamp = Date.now();
-    cb(null, `${timestamp}-${cleanName}`);
+    cb(null, Date.now() + "-" + file.originalname);
   },
 });
 
 const upload = multer({
   storage: storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-  fileFilter: function (req, file, cb) {
-    if (file.mimetype !== "application/pdf") {
-      return cb(new Error("Only PDF files are allowed"));
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === "application/pdf") {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PDF files are allowed"), false);
     }
-    cb(null, true);
   },
 });
 
 const router = express.Router();
 
-// Upload and process resume
-router.post("/upload", upload.single("resume"), async (req, res) => {
-  let uploadedFile = null;
-
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: "No file uploaded" });
-    }
-    uploadedFile = req.file;
-
-    const { name, email, replace, previousResumeId } = req.body;
-
-    if (!name || !email) {
-      throw new Error("Name and email are required");
-    }
-
-    // Create or find user
-    let user = await User.findOne({ email });
-    if (!user) {
-      user = new User({ name, email, isVerified: false });
-      try {
-        await user.save();
-      } catch (userError) {
-        if (userError.code === 11000) {
-          throw new Error(
-            "Email already exists. Please log in or use a different email."
-          );
-        }
-        throw userError;
-      }
-    }
-
-    // Handle existing resume replacement
-    if (replace && previousResumeId) {
-      const oldResume = await Resume.findById(previousResumeId);
-      if (oldResume) {
-        try {
-          const publicId = oldResume.cloudinaryUrl
-            .split("/")
-            .slice(-2)
-            .join("/")
-            .split(".")[0];
-          await cloudinary.uploader.destroy(publicId, {
-            resource_type: "raw",
-            invalidate: true,
-          });
-        } catch (deleteError) {
-          console.error("Error deleting old resume:", deleteError);
-        }
-      }
-    }
-
-    // Upload to Cloudinary with enhanced settings
-    const folderPath = `resumes/${user._id}`;
-    const timestamp = Math.floor(Date.now() / 1000);
-    const uploadResult = await cloudinary.uploader.upload(req.file.path, {
-      resource_type: "raw",
-      folder: folderPath,
-      public_id: path.basename(req.file.filename, ".pdf"),
-      type: "private",
-      access_mode: "authenticated",
-      timestamp: timestamp,
-      use_filename: true,
-      unique_filename: true,
-      format: "pdf",
-      overwrite: true,
-      invalidate: true,
-    });
-
-    if (!uploadResult?.secure_url) {
-      throw new Error("Failed to upload file to Cloudinary");
-    }
-
-    // Parse resume with enhanced error handling
-    let resumeData;
+// Upload resume
+router.post(
+  "/upload",
+  authenticateToken,
+  upload.single("resume"),
+  async (req, res) => {
     try {
-      resumeData = await parseResumeText(uploadResult.secure_url);
-    } catch (parseError) {
-      throw new Error(`Resume parsing failed: ${parseError.message}`);
-    }
+      console.log("User from token:", req.user); // Debug log
 
-    if (
-      !resumeData ||
-      (!resumeData.skills?.length &&
-        !resumeData.experience?.length &&
-        !resumeData.projects?.length)
-    ) {
-      throw new Error("Failed to extract content from resume");
-    }
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
 
-    // Create or update resume record
-    let resume;
-    if (replace && previousResumeId) {
-      resume = await Resume.findByIdAndUpdate(
-        previousResumeId,
-        {
-          filename: req.file.filename,
-          originalFilename: req.file.originalname,
-          cloudinaryUrl: uploadResult.secure_url,
-          skills: resumeData.skills,
-          experience: resumeData.experience,
-          projects: resumeData.projects,
-          $push: { parseHistory: resumeData },
-          $inc: { currentVersion: 1 },
-        },
-        { new: true }
-      );
-    } else {
-      resume = new Resume({
-        user: user._id,
+      if (!req.user || !req.user.userId) {
+        return res
+          .status(401)
+          .json({ error: "User not properly authenticated" });
+      }
+
+      // Upload to Cloudinary with authentication
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        resource_type: "raw",
+        public_id: `${req.file.originalname}`,
+        folder: `resumes/${req.user.userId}`,
+        use_filename: true,
+        unique_filename: true,
+        type: "upload",
+      });
+
+      console.log("Cloudinary upload result:", result);
+
+      // Clean up local file
+      fs.unlink(req.file.path, (err) => {
+        if (err) console.error("Error deleting local file:", err);
+      });
+
+      // Create resume record before parsing
+      const resume = new Resume({
+        user: req.user.userId,
         filename: req.file.filename,
         originalFilename: req.file.originalname,
-        cloudinaryUrl: uploadResult.secure_url,
-        skills: resumeData.skills,
-        experience: resumeData.experience,
-        projects: resumeData.projects,
-        parseHistory: [resumeData],
+        cloudinaryPublicId: result.public_id,
+        cloudinaryUrl: result.secure_url,
+        parseStatus: "pending",
       });
+
       await resume.save();
-    }
 
-    // Clean up local file
-    if (fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
+      let parsedData;
+      try {
+        parsedData = await parseResumeText(result.public_id);
+        await resume.updateParseResults(parsedData);
+      } catch (parseError) {
+        console.error("Resume parsing error:", parseError);
+        await resume.markParseFailed(parseError);
+      }
 
-    res.status(200).json({
-      message: "Resume uploaded successfully",
-      resumeId: resume._id,
-      userId: user._id,
-      url: uploadResult.secure_url,
-      skills: resumeData.skills,
-      experience: resumeData.experience,
-      projects: resumeData.projects,
-    });
-  } catch (error) {
-    console.error("Error uploading resume:", error);
+      // Generate URL using the shared function
+      const pdfUrl = generatePdfUrl(result.public_id);
 
-    // Clean up local file if it exists
-    if (uploadedFile?.path && fs.existsSync(uploadedFile.path)) {
-      fs.unlinkSync(uploadedFile.path);
-    }
-
-    res
-      .status(error.message.includes("Email already exists") ? 409 : 500)
-      .json({
-        message: error.message || "Server error while uploading resume",
+      res.json({
+        message:
+          resume.parseStatus === "completed"
+            ? "Resume uploaded and parsed successfully"
+            : "Resume uploaded but parsing failed",
+        resumeId: resume._id,
+        resume: {
+          ...resume.toObject(),
+          url: pdfUrl,
+        },
+        parsingError: resume.parseError?.message,
       });
+    } catch (error) {
+      console.error("Resume upload error:", error);
+      res.status(500).json({ error: "Error uploading resume" });
+    }
   }
-});
+);
 
 // Get resume by ID
-router.get("/:id", async (req, res) => {
+router.get("/:id", authenticateToken, async (req, res) => {
   try {
-    const resume = await Resume.findById(req.params.id).populate("user");
+    const resume = await Resume.findOne({
+      _id: req.params.id,
+      user: req.user.userId,
+    });
 
     if (!resume) {
-      return res.status(404).json({ message: "Resume not found" });
+      return res.status(404).json({ error: "Resume not found" });
     }
 
-    res.status(200).json(resume);
+    // Generate fresh authenticated URL using the shared function
+    const authenticatedUrl = generatePdfUrl(resume.cloudinaryPublicId);
+
+    res.json({
+      ...resume.toObject(),
+      url: authenticatedUrl,
+    });
   } catch (error) {
-    console.error("Error fetching resume:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Resume fetch error:", error);
+    res.status(500).json({ error: "Error fetching resume" });
   }
 });
 
 // Get all resumes for a user
-router.get("/user/:userId", async (req, res) => {
+router.get("/user/:userId", authenticateToken, async (req, res) => {
   try {
-    const resumes = await Resume.find({ user: req.params.userId }).sort({
+    // Only allow users to fetch their own resumes
+    if (req.params.userId !== req.user.userId) {
+      return res
+        .status(403)
+        .json({ message: "Unauthorized to access these resumes" });
+    }
+    const resumes = await Resume.find({ user: req.user.userId }).sort({
       createdAt: -1,
     });
-    res.status(200).json(resumes);
+
+    // Generate fresh authenticated URLs for each resume using the shared function
+    const resumesWithUrls = resumes.map((resume) => ({
+      ...resume.toObject(),
+      url: generatePdfUrl(resume.cloudinaryPublicId),
+    }));
+
+    res.status(200).json(resumesWithUrls);
   } catch (error) {
     console.error("Error fetching user resumes:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
-// Add a route to check if a user has uploaded a resume
-router.get("/user/:userId/has-resume", async (req, res) => {
+// Check if a user has uploaded a resume
+router.get("/user/:userId/has-resume", authenticateToken, async (req, res) => {
   try {
-    const resumeExists = await Resume.exists({ user: req.params.userId });
+    // Only allow users to check their own resume status
+    if (req.params.userId !== req.user.userId) {
+      return res
+        .status(403)
+        .json({ message: "Unauthorized to check this user's resume status" });
+    }
+    const resumeExists = await Resume.exists({ user: req.user.userId });
     res.status(200).json({ hasResume: !!resumeExists });
   } catch (error) {
     console.error("Error checking resume existence:", error);
