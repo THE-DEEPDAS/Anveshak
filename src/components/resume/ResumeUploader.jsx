@@ -1,40 +1,100 @@
-import React, { useState } from "react";
-import { FaUpload, FaSpinner } from "react-icons/fa";
-import FileUpload from "../ui/FileUpload.jsx";
-import Button from "../ui/Button";
+import React, { useState, useEffect } from "react";
 import { useAppContext } from "../../context/AppContext";
-import { uploadResume } from "../../services/resumeService";
+import { uploadResume, getResumeById } from "../../services/resumeService";
+import { useNavigate } from "react-router-dom";
+import Button from "../ui/Button";
+import FileUpload from "../ui/FileUpload";
+import { FaSpinner } from "react-icons/fa";
+import { useToast } from "../../components/ui/Toaster";
 
-const ResumeUploader = ({ onUploadSuccess }) => {
-  const [file, setFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
+const ResumeUploader = () => {
+  const { user, resume, setResume } = useAppContext();
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState(null);
-  const { setResume, setUser } = useAppContext();
+  const navigate = useNavigate();
+  const { showToast } = useToast();
 
-  const handleFileSelect = (selectedFile) => {
-    setFile(selectedFile);
-    setError(null);
-  };
+  useEffect(() => {
+    if (resume?.id) {
+      getResumeById(resume.id)
+        .then((data) => {
+          if (
+            data.skills?.length ||
+            data.experience?.length ||
+            data.projects?.length
+          ) {
+            setResume({
+              ...resume,
+              skills: data.skills,
+              experience: data.experience,
+              projects: data.projects,
+            });
+          } else {
+            showToast("Resume parsing in progress, please wait...", "info");
+            // Poll for parsed data
+            const pollInterval = setInterval(async () => {
+              try {
+                const updatedData = await getResumeById(resume.id);
+                if (
+                  updatedData.skills?.length ||
+                  updatedData.experience?.length ||
+                  updatedData.projects?.length
+                ) {
+                  clearInterval(pollInterval);
+                  setResume({
+                    ...resume,
+                    skills: updatedData.skills,
+                    experience: updatedData.experience,
+                    projects: updatedData.projects,
+                  });
+                  showToast("Resume parsed successfully!", "success");
+                }
+              } catch (err) {
+                console.error("Error polling resume data:", err);
+              }
+            }, 5000); // Poll every 5 seconds
 
-  const handleUpload = async () => {
-    if (!file) {
-      setError("Please select a resume to upload");
-      return;
+            // Clean up interval after 2 minutes (24 attempts)
+            setTimeout(() => {
+              clearInterval(pollInterval);
+              if (!resume.skills?.length) {
+                showToast(
+                  "Resume parsing taking longer than expected. Please try again.",
+                  "error"
+                );
+              }
+            }, 120000);
+
+            return () => clearInterval(pollInterval);
+          }
+        })
+        .catch((err) => {
+          console.error("Error fetching resume details:", err);
+          setError("Failed to load resume details");
+          showToast("Error loading resume details", "error");
+        });
+    }
+  }, [resume?.id, setResume, showToast]);
+
+  const handleUpload = async (file) => {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("resume", file);
+    formData.append("name", user.name);
+    formData.append("email", user.email);
+
+    // If there's an existing resume, add a flag to indicate replacement
+    if (resume?.id) {
+      formData.append("replace", "true");
+      formData.append("previousResumeId", resume.id);
     }
 
-    setUploading(true);
+    setIsUploading(true);
     setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append("resume", file);
-
-      // Add user data - in a real app, this would come from a form
-      formData.append("name", "Test User");
-      formData.append("email", "test@example.com");
-
       const response = await uploadResume(formData);
-
       setResume({
         id: response.resumeId,
         url: response.url,
@@ -42,50 +102,82 @@ const ResumeUploader = ({ onUploadSuccess }) => {
         experience: response.experience,
         projects: response.projects,
       });
-
-      setUser({
-        id: response.userId,
-        name: "Test User",
-        email: "test@example.com",
-      });
-
-      onUploadSuccess();
-    } catch (err) {
-      console.error("Error uploading resume:", err);
-      setError("Failed to upload resume. Please try again.");
+      showToast("Resume uploaded successfully!", "success");
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Error uploading resume:", error);
+      setError(
+        error.response?.data?.message ||
+          "Failed to upload resume. Please try again."
+      );
+      showToast(
+        error.response?.data?.message || "Failed to upload resume",
+        "error"
+      );
     } finally {
-      setUploading(false);
+      setIsUploading(false);
     }
   };
 
-  return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">
-        Upload Your Resume
-      </h2>
+  if (resume?.url) {
+    return (
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">
+          Current Resume
+        </h2>
+        <div className="flex flex-col space-y-4">
+          <div className="flex items-center justify-between">
+            <a
+              href={resume.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-700 underline"
+            >
+              View Current Resume
+            </a>
+          </div>
 
-      <div className="space-y-6">
+          <div className="border-t pt-4">
+            <h3 className="text-lg font-medium text-gray-800 mb-2">
+              Upload New Resume
+            </h3>
+            <FileUpload
+              onFileSelect={handleUpload}
+              accept=".pdf"
+              maxSize={5}
+              label="Upload a new resume to replace the current one (PDF only, max 5MB)"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <h2 className="text-xl font-semibold text-gray-800 mb-4">
+        Upload Resume
+      </h2>
+      <div className="space-y-4">
         <FileUpload
-          onFileSelect={handleFileSelect}
+          onFileSelect={handleUpload}
           accept=".pdf"
           maxSize={5}
-          label="Upload your resume (PDF)"
+          label="Upload your resume (PDF only, max 5MB)"
         />
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-red-600 text-sm">{error}</p>
+          </div>
+        )}
 
-        <div className="flex justify-end">
-          <Button
-            variant="primary"
-            size="md"
-            isLoading={uploading}
-            disabled={!file || uploading}
-            leftIcon={uploading ? undefined : <FaUpload className="h-4 w-4" />}
-            onClick={handleUpload}
-          >
-            {uploading ? "Uploading..." : "Upload Resume"}
-          </Button>
-        </div>
+        {isUploading && (
+          <div className="flex items-center justify-center py-4">
+            <FaSpinner className="animate-spin h-6 w-6 text-blue-600" />
+            <span className="ml-2 text-gray-600">Uploading resume...</span>
+          </div>
+        )}
       </div>
     </div>
   );

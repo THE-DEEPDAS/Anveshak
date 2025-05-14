@@ -1,53 +1,52 @@
 import nodemailer from "nodemailer";
 import { config } from "../config/config.js";
 
-// Configure transporter
-let transporter;
+// Create reusable transporter object using SMTP transport
+const transporter = nodemailer.createTransport({
+  host: config.email.host,
+  port: config.email.port,
+  secure: config.email.secure,
+  auth: {
+    user: config.email.user,
+    pass: config.email.pass,
+  },
+});
 
-const initializeTransporter = () => {
-  if (transporter) return;
+// Verify transporter on startup
+transporter.verify(function (error, success) {
+  if (error) {
+    console.error("SMTP connection error:", error);
+  } else {
+    console.log("SMTP server is ready to send emails");
+  }
+});
 
-  // Use SMTP configuration from config
-  transporter = nodemailer.createTransport({
-    host: config.email.host,
-    port: config.email.port,
-    secure: config.email.secure,
-    auth: {
-      user: config.email.user,
-      pass: config.email.pass,
-    },
-  });
-};
-
-// Initialize on first import
-initializeTransporter();
-
-export const sendEmail = async ({
-  to,
-  from,
-  subject,
-  text,
-  html,
-  userName,
-}) => {
+// Send email function
+export const sendEmail = async ({ to, subject, text, cc, bcc, replyTo }) => {
   try {
-    if (!transporter) {
-      initializeTransporter();
+    // Default sender
+    const from = `${process.env.COMPANY_NAME || "Cold Mailer"} <${
+      config.email.user
+    }>`;
 
-      // If still no transporter, throw error
-      if (!transporter) {
-        throw new Error("Email transporter not initialized");
-      }
-    }
-
-    // Set up email options
     const mailOptions = {
-      from: config.email.user || from,
+      from,
       to,
       subject,
       text,
-      html: html || text.replace(/\n/g, "<br>"),
+      ...(cc && { cc }),
+      ...(bcc && { bcc }),
+      ...(replyTo && { replyTo }),
     };
+
+    // Log email attempt in development
+    if (process.env.NODE_ENV === "development") {
+      console.log("Sending email:", {
+        to,
+        subject,
+        textLength: text.length,
+      });
+    }
 
     // Send email
     const info = await transporter.sendMail(mailOptions);
@@ -64,14 +63,17 @@ export const sendEmail = async ({
   }
 };
 
-export const sendPasswordResetEmail = async (to, resetToken) => {
-  const resetUrl = `${config.frontend.url}/reset-password/${resetToken}`;
-  const subject = "Password Reset Request";
-  const text = `You requested a password reset. Click the link below to reset your password:
+// Send verification email
+export const sendVerificationEmail = async (to, verificationToken) => {
+  const verificationUrl = `${config.frontend.url}/verify/${verificationToken}`;
+  const subject = "Email Verification";
+  const text = `Thank you for signing up! Please verify your email by clicking the link below:
 
-${resetUrl}
+${verificationUrl}
 
-If you did not request this, please ignore this email.`;
+This link will expire in 24 hours.
+
+If you did not sign up for an account, please ignore this email.`;
 
   await sendEmail({
     to,
@@ -80,14 +82,30 @@ If you did not request this, please ignore this email.`;
   });
 };
 
-export const sendVerificationEmail = async (to, verificationToken) => {
-  const verificationUrl = `${config.frontend.url}/verify/${verificationToken}`;
-  const subject = "Email Verification";
-  const text = `Please verify your email by clicking the link below:
+// Send password reset email
+export const sendPasswordResetEmail = async (to, resetToken) => {
+  const resetUrl = `${config.frontend.url}/reset-password/${resetToken}`;
+  const subject = "Password Reset Request";
+  const text = `You requested a password reset. Click the link below to reset your password:
 
-${verificationUrl}
+${resetUrl}
 
-If you did not request this, please ignore this email.`;
+If you did not request this, please ignore this email.
+
+This link will expire in 1 hour.`;
+
+  await sendEmail({
+    to,
+    subject,
+    text,
+  });
+};
+
+// Send test email
+export const sendTestEmail = async (to) => {
+  const subject = "Test Email from Cold Mailer";
+  const text =
+    "This is a test email to verify the email sending functionality is working correctly.";
 
   await sendEmail({
     to,

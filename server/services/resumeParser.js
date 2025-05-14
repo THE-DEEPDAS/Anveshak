@@ -22,15 +22,29 @@ export const parseResumeText = async (
   previousVersion = null
 ) => {
   try {
-    // Get secure URL from Cloudinary if it's a public ID
+    // Get secure URL from Cloudinary
     const secureUrl = cloudinaryUrl.startsWith("http")
       ? cloudinaryUrl
-      : cloudinary.url(cloudinaryUrl, { secure: true, resource_type: "raw" });
+      : cloudinary.url(cloudinaryUrl, {
+          secure: true,
+          resource_type: "raw",
+          sign_url: true, // Add signature to URL
+        });
 
-    // Download file from Cloudinary
+    // Download file from Cloudinary with auth headers
     const dataBuffer = await new Promise((resolve, reject) => {
+      const options = {
+        headers: {
+          Authorization: `Basic ${Buffer.from(
+            process.env.CLOUDINARY_API_KEY +
+              ":" +
+              process.env.CLOUDINARY_API_SECRET
+          ).toString("base64")}`,
+        },
+      };
+
       https
-        .get(secureUrl, (response) => {
+        .get(secureUrl, options, (response) => {
           if (response.statusCode !== 200) {
             reject(
               new Error(
@@ -57,27 +71,38 @@ export const parseResumeText = async (
 
     const text = data.text;
 
-    // For development/testing
+    // Only use mock data in development if no GEMINI_API_KEY AND text parsing failed
     if (!process.env.GEMINI_API_KEY) {
-      console.log("Warning: GEMINI_API_KEY not set, using mock data");
+      console.warn("Warning: GEMINI_API_KEY not set");
+      try {
+        // Try basic text parsing before falling back to mock data
+        const parsedData = await parseTextWithoutAI(text);
+        if (
+          parsedData.skills.length > 0 ||
+          parsedData.experience.length > 0 ||
+          parsedData.projects.length > 0
+        ) {
+          console.log("Successfully parsed resume without AI");
+          return parsedData;
+        }
+      } catch (parseError) {
+        console.error("Basic parsing failed:", parseError);
+      }
+      console.log("Falling back to mock data");
       return getMockResumeData();
     }
 
-    // If we have previous version data, include it in the AI context
-    const previousContext = previousVersion
-      ? {
-          skills: previousVersion.skills,
-          experience: previousVersion.experience,
-          projects: previousVersion.projects,
-        }
-      : null;
-
     // Extract information using AI with previous context if available
     const [skills, experience, projects] = await Promise.all([
-      getSkillsFromText(text, previousContext?.skills),
-      getExperienceFromText(text, previousContext?.experience),
-      getProjectsFromText(text, previousContext?.projects),
+      getSkillsFromText(text, previousVersion?.skills),
+      getExperienceFromText(text, previousVersion?.experience),
+      getProjectsFromText(text, previousVersion?.projects),
     ]);
+
+    // Validate the parsed data
+    if (!skills?.length && !experience?.length && !projects?.length) {
+      throw new Error("AI parsing returned no data");
+    }
 
     const parseResult = {
       skills,
@@ -89,12 +114,111 @@ export const parseResumeText = async (
     return parseResult;
   } catch (error) {
     console.error("Resume parsing error:", error);
-    if (process.env.NODE_ENV === "development") {
-      console.log("Using mock data as fallback in development");
-      return getMockResumeData();
+
+    // In production, fail if parsing fails
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Resume parsing failed: " + error.message);
     }
-    throw error;
+
+    // In development, try basic parsing before using mock data
+    try {
+      const text = await pdfParse(dataBuffer);
+      const parsedData = await parseTextWithoutAI(text.text);
+      if (
+        parsedData.skills.length > 0 ||
+        parsedData.experience.length > 0 ||
+        parsedData.projects.length > 0
+      ) {
+        return parsedData;
+      }
+    } catch (parseError) {
+      console.error("Basic parsing failed:", parseError);
+    }
+
+    return getMockResumeData();
   }
+};
+
+// Basic text parsing function without AI
+const parseTextWithoutAI = async (text) => {
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const skills = [];
+  const experience = [];
+  const projects = [];
+
+  let currentSection = "";
+
+  for (const line of lines) {
+    const lowerLine = line.toLowerCase();
+
+    // Detect sections
+    if (
+      lowerLine.includes("skill") ||
+      lowerLine.includes("technology") ||
+      lowerLine.includes("tech stack")
+    ) {
+      currentSection = "skills";
+      continue;
+    } else if (
+      lowerLine.includes("experience") ||
+      lowerLine.includes("work") ||
+      lowerLine.includes("employment")
+    ) {
+      currentSection = "experience";
+      continue;
+    } else if (
+      lowerLine.includes("project") ||
+      lowerLine.includes("portfolio")
+    ) {
+      currentSection = "projects";
+      continue;
+    }
+
+    // Skip common section headers
+    if (
+      lowerLine.includes("education") ||
+      lowerLine.includes("contact") ||
+      lowerLine.includes("reference") ||
+      lowerLine.includes("summary") ||
+      lowerLine.length < 3
+    ) {
+      continue;
+    }
+
+    // Add content to appropriate section
+    switch (currentSection) {
+      case "skills":
+        // Split line into individual skills
+        line.split(/[,|•]/).forEach((skill) => {
+          const cleanedSkill = skill.trim();
+          if (cleanedSkill.length > 2 && !skills.includes(cleanedSkill)) {
+            skills.push(cleanedSkill);
+          }
+        });
+        break;
+      case "experience":
+        if (line.length > 10) {
+          experience.push(line);
+        }
+        break;
+      case "projects":
+        if (line.length > 10) {
+          projects.push(line);
+        }
+        break;
+    }
+  }
+
+  return {
+    skills,
+    experience,
+    projects,
+    parsedAt: new Date(),
+  };
 };
 
 // Function to iterate parsing with feedback

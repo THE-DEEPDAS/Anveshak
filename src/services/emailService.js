@@ -1,14 +1,22 @@
 import axios from "axios";
 import { API_ENDPOINTS } from "../config/api";
 
-export const generateEmails = async (resumeId) => {
+export const generateEmails = async (resumeId, options = {}) => {
+  if (!resumeId) {
+    throw new Error("Resume ID is required");
+  }
+
   try {
     const response = await axios.post(`${API_ENDPOINTS.emails}/generate`, {
-      resumeId,
+      resumeId: resumeId.toString(),
+      ...options,
     });
     return response.data;
   } catch (error) {
-    console.error("Error generating emails:", error);
+    console.error("Error in email generation:", error);
+    if (error.response?.data?.message) {
+      throw new Error(error.response.data.message);
+    }
     throw error;
   }
 };
@@ -33,6 +41,26 @@ export const getEmailsByResumeId = async (resumeId) => {
     return response.data;
   } catch (error) {
     console.error("Error fetching emails:", error);
+    throw error;
+  }
+};
+
+export const getEmailById = async (emailId) => {
+  try {
+    const response = await axios.get(`${API_ENDPOINTS.emails}/${emailId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching email:", error);
+    throw error;
+  }
+};
+
+export const getUserEmails = async (userId) => {
+  try {
+    const response = await axios.get(`${API_ENDPOINTS.emails}/user/${userId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching user emails:", error);
     throw error;
   }
 };

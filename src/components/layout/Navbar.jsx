@@ -5,6 +5,7 @@ import { useAppContext } from "../../context/AppContext";
 import { logout } from "../../services/authService";
 import AnveshakLogo from "../../components/assets/Anveshak.jpg";
 import axios from "axios";
+import { API_ENDPOINTS } from "../../config/api";
 
 const Navbar = () => {
   const location = useLocation();
@@ -13,6 +14,7 @@ const Navbar = () => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [resume, setResume] = useState(null);
   const menuRef = useRef(null);
+  const hasCheckedResume = useRef(false);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -25,18 +27,26 @@ const Navbar = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Check resume status only once when user is available
   useEffect(() => {
-    if (user) {
-      // Correct the API endpoint
-      axios.get(`/api/resumes/user/${user.id}/has-resume`).then((response) => {
-        setResume(response.data.hasResume ? { id: "exists" } : null);
-      });
+    if (user && !hasCheckedResume.current) {
+      hasCheckedResume.current = true;
+      axios
+        .get(`${API_ENDPOINTS.resumes}/user/${user._id}/has-resume`)
+        .then((response) => {
+          setResume(response.data.hasResume ? { id: "exists" } : null);
+        })
+        .catch((error) => {
+          console.error("Error checking resume status:", error);
+        });
     }
   }, [user]);
 
   const handleLogout = async () => {
     try {
       await logout();
+      hasCheckedResume.current = false; // Reset the check for next login
+      setResume(null);
       navigate("/login");
     } catch (error) {
       console.error("Logout error:", error);
@@ -48,7 +58,15 @@ const Navbar = () => {
   };
 
   const renderAuthLinks = () => {
-    if (user) return null;
+    // Don't show login/signup if user is logged in
+    if (user) {
+      return null;
+    }
+
+    // Only show auth links if not on login or signup pages
+    if (location.pathname === "/login" || location.pathname === "/signup") {
+      return null;
+    }
 
     return (
       <>
