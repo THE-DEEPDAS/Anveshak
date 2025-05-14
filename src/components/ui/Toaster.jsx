@@ -46,14 +46,14 @@ export const Toaster = ({ toasts = [], removeToast }) => {
   const safeToasts = Array.isArray(toasts) ? toasts : [];
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
+    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
       <AnimatePresence>
         {safeToasts.map((toast) => (
           <motion.div
             key={toast.id}
-            initial={{ opacity: 0, y: 20, scale: 0.8 }}
+            initial={{ opacity: 0, y: -20, scale: 0.8 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.8 }}
+            exit={{ opacity: 0, y: 20, scale: 0.8 }}
             transition={{ duration: 0.2 }}
             className={`flex items-center justify-between p-4 rounded-lg shadow-lg ${
               toast.type === "success"

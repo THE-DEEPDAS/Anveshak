@@ -50,6 +50,13 @@ export const login = async (credentials) => {
 
 export const logout = async () => {
   try {
+    // Clear the server-side cookie
+    await axios.post(
+      `${API_ENDPOINTS.auth}/logout`,
+      {},
+      { withCredentials: true }
+    );
+
     // Clear local storage
     localStorage.removeItem("user");
     localStorage.removeItem("token");
@@ -57,10 +64,15 @@ export const logout = async () => {
     // Clear auth header
     delete axios.defaults.headers.common["Authorization"];
 
-    // Clear the cookie by making a request to the server
-    await axios.post(`${API_ENDPOINTS.auth}/logout`);
+    // Clear AppContext user state by reloading the page
+    window.location.href = "/login";
   } catch (error) {
     console.error("Logout error:", error);
+    // Still clear local data even if server request fails
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    delete axios.defaults.headers.common["Authorization"];
+    window.location.href = "/login";
   }
 };
 
@@ -68,8 +80,12 @@ export const getCurrentUser = async () => {
   try {
     // First try to get user from localStorage
     const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      const user = JSON.parse(storedUser);
+    const token = localStorage.getItem("token");
+
+    if (storedUser && token) {
+      // Set the auth header
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
       // Verify the stored user is still valid
       const response = await axios.get(`${API_ENDPOINTS.auth}/me`);
       if (response.data) {
@@ -77,7 +93,8 @@ export const getCurrentUser = async () => {
       }
     }
 
-    // If no stored user or invalid, try to get from server
+    // If we get here, either there's no stored user or the token is invalid
+    // Try to get user data using HTTP-only cookie
     const response = await axios.get(`${API_ENDPOINTS.auth}/me`);
     if (response.data) {
       localStorage.setItem("user", JSON.stringify(response.data));
@@ -90,6 +107,7 @@ export const getCurrentUser = async () => {
     // Clear stored data if there's an error
     localStorage.removeItem("user");
     localStorage.removeItem("token");
+    delete axios.defaults.headers.common["Authorization"];
     return null;
   }
 };

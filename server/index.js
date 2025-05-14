@@ -21,24 +21,31 @@ const __dirname = dirname(__filename);
 // Create Express app
 const app = express();
 
-// CORS configuration with credentials support
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    exposedHeaders: ["set-cookie"],
-  })
-);
+// CORS configuration
+app.use(cors(config.cors));
 
 // Enable pre-flight requests for all routes
-app.options("*", cors());
+app.options("*", cors(config.cors));
 
+// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(morgan("combined"));
+
+// Custom morgan format to minimize console noise
+app.use(
+  morgan(":method :url :status - :response-time ms", {
+    skip: (req, res) => {
+      // Skip logging for successful static file requests
+      return (
+        req.method === "GET" &&
+        (req.url.startsWith("/static/") ||
+          req.url.includes(".") ||
+          req.url === "/favicon.ico")
+      );
+    },
+  })
+);
 
 // Temporary storage for development
 const storage = multer.diskStorage({
@@ -59,6 +66,11 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+// Trust proxy if in production
+if (config.server.nodeEnv === "production") {
+  app.set("trust proxy", 1);
+}
+
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/resumes", resumeRoutes);
@@ -73,6 +85,7 @@ mongoose
   })
   .catch((error) => {
     console.error("MongoDB connection error:", error);
+    process.exit(1);
   });
 
 // Serve static files in production
@@ -84,9 +97,51 @@ if (config.server.nodeEnv === "production") {
   });
 }
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  // Log full error in development
+  if (config.server.nodeEnv === "development") {
+    console.error(err);
+  }
+
+  // Log only error message and stack in production
+  console.error(`${err.name}: ${err.message}`);
+
+  // Don't expose error details in production
+  const response = {
+    message:
+      config.server.nodeEnv === "development"
+        ? err.message
+        : "An error occurred",
+    error:
+      config.server.nodeEnv === "development"
+        ? {
+            name: err.name,
+            message: err.message,
+            stack: err.stack,
+          }
+        : undefined,
+  };
+
+  res.status(err.status || 500).json(response);
+});
+
 // Start server
-app.listen(config.server.port, () => {
+const server = app.listen(config.server.port, () => {
   console.log(`Server running on port ${config.server.port}`);
+});
+
+// Handle uncaught exceptions and rejections
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught Exception:", error);
+  // Gracefully shutdown
+  server.close(() => process.exit(1));
+});
+
+process.on("unhandledRejection", (error) => {
+  console.error("Unhandled Rejection:", error);
+  // Gracefully shutdown
+  server.close(() => process.exit(1));
 });
 
 export default app;

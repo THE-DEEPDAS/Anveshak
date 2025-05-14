@@ -7,9 +7,13 @@ import {
   sendPasswordResetEmail,
 } from "../services/emailService.js";
 import { authenticateToken } from "../middleware/auth.js";
-import bcrypt from "bcryptjs";
+import { verifyEmailLimiter, apiLimiter } from "../middleware/rateLimiter.js";
+import { config } from "../config/config.js";
 
 const router = express.Router();
+
+// Apply rate limiter to all auth routes
+router.use(apiLimiter);
 
 // Register
 router.post("/register", async (req, res) => {
@@ -26,12 +30,6 @@ router.post("/register", async (req, res) => {
           password: !password,
         },
       });
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ message: "Invalid email format" });
     }
 
     // Check if user exists
@@ -71,14 +69,14 @@ router.post("/register", async (req, res) => {
   } catch (error) {
     console.error("Registration error:", error);
     res.status(500).json({
-      message: "Server error during registration",
+      message: "Server error",
       error: error.message,
     });
   }
 });
 
-// Verify email
-router.get("/verify/:token", async (req, res) => {
+// Verify email - add verifyEmailLimiter
+router.get("/verify/:token", verifyEmailLimiter, async (req, res) => {
   try {
     const user = await User.findOne({
       verificationToken: req.params.token,
@@ -137,12 +135,7 @@ router.post("/login", async (req, res) => {
     });
 
     // Set HTTP-only cookie that expires in 30 days
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    });
+    res.cookie("token", token, config.cookie);
 
     res.json({
       token,
@@ -213,19 +206,66 @@ router.post("/reset-password/:token", async (req, res) => {
 router.get("/me", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
     res.json(user);
   } catch (error) {
     console.error("Get user error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Refresh token
+router.get("/refresh-token", async (req, res) => {
+  try {
+    const token = req.cookies.token;
+
+    if (!token) {
+      return res.status(401).json({ message: "No token provided" });
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await User.findById(decoded.userId).select("-password");
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Create new token
+      const newToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+        expiresIn: "30d",
+      });
+
+      // Set new cookie
+      res.cookie("token", newToken, config.cookie);
+
+      // Send new token and user data
+      res.json({
+        token: newToken,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+        },
+      });
+    } catch (error) {
+      // Clear invalid token
+      res.clearCookie("token", config.cookie);
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+  } catch (error) {
+    console.error("Token refresh error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
 // Logout
 router.post("/logout", (req, res) => {
   res.clearCookie("token", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    ...config.cookie,
+    maxAge: 0,
   });
   res.json({ message: "Logged out successfully" });
 });

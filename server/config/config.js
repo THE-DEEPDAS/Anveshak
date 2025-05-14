@@ -18,6 +18,7 @@ const requiredEnvVars = {
   EMAIL_SECURE: process.env.EMAIL_SECURE,
   MONGODB_URI: process.env.MONGODB_URI,
   FRONTEND_URL: process.env.FRONTEND_URL,
+  JWT_SECRET: process.env.JWT_SECRET,
 };
 
 // Check for missing environment variables
@@ -30,6 +31,23 @@ if (missingVars.length > 0) {
     `Missing required environment variables: ${missingVars.join(", ")}`
   );
 }
+
+// Cookie settings
+const cookieConfig = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+  maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+};
+
+// CORS settings
+const corsConfig = {
+  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  exposedHeaders: ["set-cookie"],
+};
 
 // Export configuration
 export const config = {
@@ -50,6 +68,12 @@ export const config = {
   frontend: {
     url: process.env.FRONTEND_URL || "http://localhost:5173",
   },
+  jwt: {
+    secret: process.env.JWT_SECRET,
+    expiresIn: "30d",
+  },
+  cookie: cookieConfig,
+  cors: corsConfig,
 };
 
 export default config;

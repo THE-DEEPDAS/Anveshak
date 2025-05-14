@@ -61,12 +61,31 @@ router.post("/upload", upload.single("resume"), async (req, res) => {
       return res.status(400).json({ message: "Name and email are required" });
     }
 
-    // Create or find user
+    // Create or find user - now handles unverified users
     let user = await User.findOne({ email });
 
     if (!user) {
-      user = new User({ name, email });
-      await user.save();
+      // Create new unverified user without password
+      user = new User({
+        name,
+        email,
+        isVerified: false, // Explicitly set as unverified
+      });
+      try {
+        await user.save();
+      } catch (userError) {
+        console.error("Error creating user:", userError);
+        if (userError.code === 11000) {
+          // Duplicate key error
+          return res
+            .status(409)
+            .json({
+              message:
+                "Email already exists. Please log in or use a different email.",
+            });
+        }
+        throw userError;
+      }
     }
 
     // Upload file to Cloudinary

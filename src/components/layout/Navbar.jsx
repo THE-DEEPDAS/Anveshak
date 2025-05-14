@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { FaEnvelope, FaUserCircle, FaChevronDown } from "react-icons/fa";
+import { FaUserCircle, FaChevronDown } from "react-icons/fa";
 import { useAppContext } from "../../context/AppContext";
 import { logout } from "../../services/authService";
+import AnveshakLogo from "../../components/assets/Anveshak.jpg";
 
 const Navbar = () => {
   const location = useLocation();
@@ -22,16 +23,19 @@ const Navbar = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   const toggleProfileMenu = () => {
     setShowProfileMenu(!showProfileMenu);
   };
 
-  // Only show auth links if user is not logged in
   const renderAuthLinks = () => {
     if (user) return null;
 
@@ -53,7 +57,6 @@ const Navbar = () => {
     );
   };
 
-  // Render profile menu if user is logged in
   const renderProfileMenu = () => {
     if (!user) return null;
 
@@ -106,7 +109,11 @@ const Navbar = () => {
     <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <Link to="/" className="flex items-center space-x-2">
-          <FaEnvelope className="h-6 w-6 text-blue-600" />
+          <img
+            src={AnveshakLogo}
+            alt="Anveshak Logo"
+            className="h-8 w-8 object-contain rounded-full"
+          />
           <span className="font-bold text-xl text-gray-800">Anveshak</span>
         </Link>
 
