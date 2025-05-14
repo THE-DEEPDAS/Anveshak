@@ -27,31 +27,55 @@ export const parseResumeText = async (cloudinaryUrl) => {
 
     const dataBuffer = await response.arrayBuffer();
 
-    // Parse PDF to text
-    const data = await pdfParse(Buffer.from(dataBuffer));
-    const text = data.text;
-
-    // For development/testing - use mock data if AI service is not set up
-    if (!process.env.GEMINI_API_KEY) {
-      return getMockResumeData();
+    // Verify the buffer is not empty
+    if (!dataBuffer || dataBuffer.byteLength === 0) {
+      throw new Error("Empty file received from Cloudinary");
     }
 
-    // Extract skills, experience, and projects using AI
-    const [skills, experience, projects] = await Promise.all([
-      getSkillsFromText(text),
-      getExperienceFromText(text),
-      getProjectsFromText(text),
-    ]);
+    try {
+      // Parse PDF to text
+      const data = await pdfParse(Buffer.from(dataBuffer));
+      const text = data.text;
 
-    return {
-      skills,
-      experience,
-      projects,
-    };
+      if (!text || text.trim().length === 0) {
+        throw new Error("No text content found in PDF");
+      }
+
+      // For development/testing - use mock data if AI service is not set up
+      if (!process.env.GEMINI_API_KEY) {
+        console.log("Warning: GEMINI_API_KEY not set, using mock data");
+        return getMockResumeData();
+      }
+
+      // Extract skills, experience, and projects using AI
+      const [skills, experience, projects] = await Promise.all([
+        getSkillsFromText(text),
+        getExperienceFromText(text),
+        getProjectsFromText(text),
+      ]);
+
+      // Validate extracted data
+      if (!skills || !experience || !projects) {
+        throw new Error("Failed to extract resume information");
+      }
+
+      return {
+        skills,
+        experience,
+        projects,
+      };
+    } catch (pdfError) {
+      console.error("PDF parsing error:", pdfError);
+      throw new Error(`Failed to parse PDF: ${pdfError.message}`);
+    }
   } catch (error) {
     console.error("Error parsing resume:", error);
-    // Return mock data as fallback
-    return getMockResumeData();
+    // Only return mock data in development
+    if (process.env.NODE_ENV === "development") {
+      console.log("Using mock data as fallback in development");
+      return getMockResumeData();
+    }
+    throw error;
   }
 };
 

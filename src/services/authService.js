@@ -1,76 +1,96 @@
-import axios from 'axios';
-
-const API_URL = 'http://localhost:5000/api/auth';
+import axios from "axios";
+import { API_ENDPOINTS } from "../config/api";
 
 export const register = async (userData) => {
   try {
-    const response = await axios.post(`${API_URL}/register`, userData);
+    const response = await axios.post(
+      `${API_ENDPOINTS.auth}/register`,
+      userData
+    );
     return response.data;
   } catch (error) {
-    throw error.response.data;
+    // Throw a more detailed error object that includes validation errors
+    if (error.response) {
+      throw {
+        response: {
+          data: {
+            message: error.response.data.message,
+            missing: error.response.data.missing || {},
+          },
+        },
+      };
+    }
+    throw error;
   }
 };
 
 export const login = async (credentials) => {
   try {
-    const response = await axios.post(`${API_URL}/login`, credentials);
+    const response = await axios.post(
+      `${API_ENDPOINTS.auth}/login`,
+      credentials
+    );
     const { token, user } = response.data;
-    
-    // Store token
-    localStorage.setItem('token', token);
-    
-    // Set default authorization header
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    
+
+    // Store token and set default Authorization header
+    localStorage.setItem("token", token);
+    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
     return user;
   } catch (error) {
-    throw error.response.data;
+    const message = error.response?.data?.message || "Login failed";
+    throw { response: { data: { message } } };
   }
 };
 
 export const logout = () => {
-  localStorage.removeItem('token');
-  delete axios.defaults.headers.common['Authorization'];
+  localStorage.removeItem("token");
+  delete axios.defaults.headers.common["Authorization"];
 };
 
 export const getCurrentUser = async () => {
   try {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     if (!token) return null;
 
-    const response = await axios.get(`${API_URL}/me`, {
-      headers: { Authorization: `Bearer ${token}` }
+    const response = await axios.get(`${API_ENDPOINTS.auth}/me`, {
+      headers: { Authorization: `Bearer ${token}` },
     });
     return response.data;
   } catch (error) {
-    console.error('Get current user error:', error);
+    console.error("Get current user error:", error);
     return null;
   }
 };
 
 export const verifyEmail = async (token) => {
   try {
-    const response = await axios.get(`${API_URL}/verify/${token}`);
+    const response = await axios.get(`${API_ENDPOINTS.auth}/verify/${token}`);
     return response.data;
   } catch (error) {
-    throw error.response.data;
+    throw error.response?.data || error;
   }
 };
 
 export const forgotPassword = async (email) => {
   try {
-    const response = await axios.post(`${API_URL}/forgot-password`, { email });
+    const response = await axios.post(`${API_ENDPOINTS.auth}/forgot-password`, {
+      email,
+    });
     return response.data;
   } catch (error) {
-    throw error.response.data;
+    throw error.response?.data || error;
   }
 };
 
 export const resetPassword = async (token, password) => {
   try {
-    const response = await axios.post(`${API_URL}/reset-password/${token}`, { password });
+    const response = await axios.post(
+      `${API_ENDPOINTS.auth}/reset-password/${token}`,
+      { password }
+    );
     return response.data;
   } catch (error) {
-    throw error.response.data;
+    throw error.response?.data || error;
   }
 };

@@ -29,13 +29,13 @@ const Footer = () => {
             <div>
               <h3 className="font-semibold mb-2 text-white">Connect</h3>
               <div className="flex space-x-4 justify-center md:justify-start">
-                <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
+                <a href="https://github.com/THE-DEEPDAS" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
                   <FaGithub className="h-5 w-5" />
                 </a>
-                <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
+                <a href="https://www.linkedin.com/in/deep-das-4b5aa527b/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
                   <FaLinkedin className="h-5 w-5" />
                 </a>
-                <a href="mailto:contact@coldmailer.com" className="text-gray-400 hover:text-white transition-colors">
+                <a href="mailto:deepdblm@outlook.com" className="text-gray-400 hover:text-white transition-colors">
                   <FaEnvelope className="h-5 w-5" />
                 </a>
               </div>
@@ -44,7 +44,7 @@ const Footer = () => {
         </div>
         
         <div className="border-t border-gray-700 mt-6 pt-6 text-center text-xs text-gray-500">
-          <p>&copy; {new Date().getFullYear()} ColdMailer. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Anveshak. All rights reserved.</p>
           <p className="mt-1">Built with React, Node.js, MongoDB, and Gemini AI.</p>
         </div>
       </div>

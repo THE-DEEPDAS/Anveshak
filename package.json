@@ -4,12 +4,11 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"cd server && npm run dev\" \"vite\"",
     "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview",
-    "server": "node server/index.js",
-    "dev:all": "concurrently \"npm run dev\" \"npm run server\""
+    "start": "cd server && npm run start",
+    "postinstall": "cd server && npm install",
+    "install-all": "npm install && cd server && npm install"
   },
   "dependencies": {
     "@google/generative-ai": "^0.2.0",

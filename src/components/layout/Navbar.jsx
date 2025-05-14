@@ -1,10 +1,106 @@
-import React from "react";
-import { Link, useLocation } from "react-router-dom";
-import { FaEnvelope } from "react-icons/fa";
+import React, { useState, useEffect, useRef } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { FaEnvelope, FaUserCircle, FaChevronDown } from "react-icons/fa";
+import { useAppContext } from "../../context/AppContext";
+import { logout } from "../../services/authService";
 
 const Navbar = () => {
   const location = useLocation();
-  const token = localStorage.getItem("token");
+  const navigate = useNavigate();
+  const { user } = useAppContext();
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
+  const toggleProfileMenu = () => {
+    setShowProfileMenu(!showProfileMenu);
+  };
+
+  // Only show auth links if user is not logged in
+  const renderAuthLinks = () => {
+    if (user) return null;
+
+    return (
+      <>
+        <Link
+          to="/signup"
+          className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
+        >
+          Sign Up
+        </Link>
+        <Link
+          to="/login"
+          className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
+        >
+          Login
+        </Link>
+      </>
+    );
+  };
+
+  // Render profile menu if user is logged in
+  const renderProfileMenu = () => {
+    if (!user) return null;
+
+    return (
+      <div className="relative" ref={menuRef}>
+        <button
+          onClick={toggleProfileMenu}
+          className="flex items-center space-x-2 px-3 py-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors focus:outline-none"
+        >
+          <FaUserCircle className="h-5 w-5 text-gray-600" />
+          <span className="text-sm font-medium text-gray-700">{user.name}</span>
+          <FaChevronDown
+            className={`h-3 w-3 text-gray-500 transition-transform ${
+              showProfileMenu ? "rotate-180" : ""
+            }`}
+          />
+        </button>
+
+        {showProfileMenu && (
+          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-50 border border-gray-200">
+            <div className="px-4 py-2 border-b border-gray-200">
+              <p className="text-sm font-medium text-gray-900">{user.name}</p>
+              <p className="text-xs text-gray-600">{user.email}</p>
+            </div>
+
+            <Link
+              to="/dashboard"
+              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              onClick={() => setShowProfileMenu(false)}
+            >
+              Dashboard
+            </Link>
+
+            <button
+              onClick={() => {
+                setShowProfileMenu(false);
+                handleLogout();
+              }}
+              className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+            >
+              Sign out
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
@@ -25,41 +121,8 @@ const Navbar = () => {
           >
             Home
           </Link>
-          {!token ? (
-            <>
-              <Link
-                to="/signup"
-                className={`text-sm font-medium ${
-                  location.pathname === "/signup"
-                    ? "text-blue-600"
-                    : "text-gray-600 hover:text-blue-600 transition-colors"
-                }`}
-              >
-                Sign Up
-              </Link>
-              <Link
-                to="/login"
-                className={`text-sm font-medium ${
-                  location.pathname === "/login"
-                    ? "text-blue-600"
-                    : "text-gray-600 hover:text-blue-600 transition-colors"
-                }`}
-              >
-                Login
-              </Link>
-            </>
-          ) : (
-            <Link
-              to="/dashboard"
-              className={`text-sm font-medium ${
-                location.pathname === "/dashboard"
-                  ? "text-blue-600"
-                  : "text-gray-600 hover:text-blue-600 transition-colors"
-              }`}
-            >
-              Profile
-            </Link>
-          )}
+          {renderAuthLinks()}
+          {renderProfileMenu()}
         </nav>
       </div>
     </header>

@@ -6,4 +6,21 @@ export default defineConfig({
   optimizeDeps: {
     exclude: [],
   },
+  define: {
+    "import.meta.env.VITE_API_URL": JSON.stringify(
+      process.env.API_URL || "http://localhost:5000/api"
+    ),
+  },
+  server: {
+    port: 5173,
+    proxy: {
+      "/api": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+        rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+    },
+  },
 });

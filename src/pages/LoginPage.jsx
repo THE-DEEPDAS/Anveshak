@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../components/ui/Button";
-import { loginUser } from "../services/authService";
+import { login } from "../services/authService";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -12,7 +12,7 @@ const LoginPage = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const response = await loginUser({ email, password });
+      const response = await login({ email, password });
       localStorage.setItem("token", response.token);
       navigate("/dashboard");
     } catch (err) {

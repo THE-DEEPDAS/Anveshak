@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { config } from "../config/config.js";
 
 // Configure transporter
 let transporter;
@@ -6,41 +7,16 @@ let transporter;
 const initializeTransporter = () => {
   if (transporter) return;
 
-  if (
-    process.env.EMAIL_HOST &&
-    process.env.EMAIL_USER &&
-    process.env.EMAIL_PASS
-  ) {
-    // Use SMTP configuration
-    transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
-      port: process.env.EMAIL_PORT || 587,
-      secure: process.env.EMAIL_SECURE === "true",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-  } else {
-    // Use ethereal.email for testing
-    nodemailer
-      .createTestAccount()
-      .then((testAccount) => {
-        transporter = nodemailer.createTransport({
-          host: "smtp.ethereal.email",
-          port: 587,
-          secure: false,
-          auth: {
-            user: testAccount.user,
-            pass: testAccount.pass,
-          },
-        });
-        console.log("Using ethereal email for testing:", testAccount.user);
-      })
-      .catch((error) => {
-        console.error("Failed to create test email account:", error);
-      });
-  }
+  // Use SMTP configuration from config
+  transporter = nodemailer.createTransport({
+    host: config.email.host,
+    port: config.email.port,
+    secure: config.email.secure,
+    auth: {
+      user: config.email.user,
+      pass: config.email.pass,
+    },
+  });
 };
 
 // Initialize on first import
@@ -66,7 +42,7 @@ export const sendEmail = async ({
 
     // Set up email options
     const mailOptions = {
-      from: process.env.EMAIL_USER || from,
+      from: config.email.user || from,
       to,
       subject,
       text,
@@ -89,7 +65,7 @@ export const sendEmail = async ({
 };
 
 export const sendPasswordResetEmail = async (to, resetToken) => {
-  const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+  const resetUrl = `${config.frontend.url}/reset-password/${resetToken}`;
   const subject = "Password Reset Request";
   const text = `You requested a password reset. Click the link below to reset your password:
 
@@ -105,7 +81,7 @@ If you did not request this, please ignore this email.`;
 };
 
 export const sendVerificationEmail = async (to, verificationToken) => {
-  const verificationUrl = `${process.env.FRONTEND_URL}/verify/${verificationToken}`;
+  const verificationUrl = `${config.frontend.url}/verify/${verificationToken}`;
   const subject = "Email Verification";
   const text = `Please verify your email by clicking the link below:
 

@@ -1,33 +1,38 @@
-import axios from 'axios';
-
-const API_URL = 'http://localhost:5000/api';
+import axios from "axios";
+import { API_ENDPOINTS } from "../config/api";
 
 export const generateEmails = async (resumeId) => {
   try {
-    const response = await axios.post(`${API_URL}/emails/generate`, { resumeId });
+    const response = await axios.post(`${API_ENDPOINTS.emails}/generate`, {
+      resumeId,
+    });
     return response.data;
   } catch (error) {
-    console.error('Error generating emails:', error);
+    console.error("Error generating emails:", error);
     throw error;
   }
 };
 
 export const sendEmails = async (emailIds) => {
   try {
-    const response = await axios.post(`${API_URL}/emails/send`, { emailIds });
+    const response = await axios.post(`${API_ENDPOINTS.emails}/send`, {
+      emailIds,
+    });
     return response.data;
   } catch (error) {
-    console.error('Error sending emails:', error);
+    console.error("Error sending emails:", error);
     throw error;
   }
 };
 
 export const getEmailsByResumeId = async (resumeId) => {
   try {
-    const response = await axios.get(`${API_URL}/emails/resume/${resumeId}`);
+    const response = await axios.get(
+      `${API_ENDPOINTS.emails}/resume/${resumeId}`
+    );
     return response.data;
   } catch (error) {
-    console.error('Error fetching emails:', error);
+    console.error("Error fetching emails:", error);
     throw error;
   }
 };
@@ -36,10 +41,10 @@ export const getEmailsByResumeId = async (resumeId) => {
 export const getMockEmails = () => {
   return [
     {
-      id: 'email-1',
-      company: 'Tech Innovations Inc.',
-      recipient: 'hiring@techinnovations.com',
-      subject: 'Junior Developer Position - Experienced React Developer',
+      id: "email-1",
+      company: "Tech Innovations Inc.",
+      recipient: "hiring@techinnovations.com",
+      subject: "Junior Developer Position - Experienced React Developer",
       body: `Dear Hiring Manager,
 
 I was impressed by Tech Innovations' recent work on AI-powered analytics platforms, especially your commitment to user-centered design and performance optimization.
@@ -52,13 +57,13 @@ Thank you for your consideration.
 
 Best regards,
 Test User`,
-      status: 'draft'
+      status: "draft",
     },
     {
-      id: 'email-2',
-      company: 'Data Systems Co.',
-      recipient: 'careers@datasystems.com',
-      subject: 'Full Stack Developer Position Inquiry',
+      id: "email-2",
+      company: "Data Systems Co.",
+      recipient: "careers@datasystems.com",
+      subject: "Full Stack Developer Position Inquiry",
       body: `Dear Hiring Team,
 
 I've been following Data Systems' groundbreaking work in cloud infrastructure and was particularly impressed by your recent case study on scalable database solutions.
@@ -71,13 +76,13 @@ Looking forward to discussing how I can contribute to your team.
 
 Best regards,
 Test User`,
-      status: 'draft'
+      status: "draft",
     },
     {
-      id: 'email-3',
-      company: 'Mobile Solutions Ltd.',
-      recipient: 'internships@mobilesolutions.com',
-      subject: 'Mobile Developer Internship Application',
+      id: "email-3",
+      company: "Mobile Solutions Ltd.",
+      recipient: "internships@mobilesolutions.com",
+      subject: "Mobile Developer Internship Application",
       body: `Dear Internship Coordinator,
 
 I recently used Mobile Solutions' travel app and was impressed by its intuitive interface and performance. Your commitment to creating seamless mobile experiences aligns perfectly with my development philosophy.
@@ -90,7 +95,7 @@ Thank you for considering my application.
 
 Best regards,
 Test User`,
-      status: 'draft'
-    }
+      status: "draft",
+    },
   ];
 };
