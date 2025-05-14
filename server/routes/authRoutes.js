@@ -91,12 +91,16 @@ router.get("/verify/:token", async (req, res) => {
         .json({ message: "Invalid or expired verification token" });
     }
 
+    if (user.isVerified) {
+      return res.status(400).json({ message: "Email is already verified" });
+    }
+
     user.isVerified = true;
     user.verificationToken = undefined;
     user.verificationTokenExpiry = undefined;
     await user.save();
 
-    res.json({ message: "Email verified successfully. You can now log in." });
+    res.json({ message: "Email verified successfully" });
   } catch (error) {
     console.error("Verification error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -127,9 +131,17 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // Create token
+    // Create token with 30 days expiration
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "24h",
+      expiresIn: "30d",
+    });
+
+    // Set HTTP-only cookie that expires in 30 days
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     });
 
     res.json({
@@ -206,6 +218,16 @@ router.get("/me", authenticateToken, async (req, res) => {
     console.error("Get user error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
+});
+
+// Logout
+router.post("/logout", (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+  });
+  res.json({ message: "Logged out successfully" });
 });
 
 export default router;

@@ -1,6 +1,9 @@
 import axios from "axios";
 import { API_ENDPOINTS } from "../config/api";
 
+// Configure axios to include credentials
+axios.defaults.withCredentials = true;
+
 export const register = async (userData) => {
   try {
     const response = await axios.post(
@@ -9,7 +12,6 @@ export const register = async (userData) => {
     );
     return response.data;
   } catch (error) {
-    // Throw a more detailed error object that includes validation errors
     if (error.response) {
       throw {
         response: {
@@ -32,8 +34,11 @@ export const login = async (credentials) => {
     );
     const { token, user } = response.data;
 
-    // Store token and set default Authorization header
+    // Store user data in localStorage for persistence
+    localStorage.setItem("user", JSON.stringify(user));
     localStorage.setItem("token", token);
+
+    // Set default auth header for future requests
     axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
     return user;
@@ -43,22 +48,48 @@ export const login = async (credentials) => {
   }
 };
 
-export const logout = () => {
-  localStorage.removeItem("token");
-  delete axios.defaults.headers.common["Authorization"];
+export const logout = async () => {
+  try {
+    // Clear local storage
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+
+    // Clear auth header
+    delete axios.defaults.headers.common["Authorization"];
+
+    // Clear the cookie by making a request to the server
+    await axios.post(`${API_ENDPOINTS.auth}/logout`);
+  } catch (error) {
+    console.error("Logout error:", error);
+  }
 };
 
 export const getCurrentUser = async () => {
   try {
-    const token = localStorage.getItem("token");
-    if (!token) return null;
+    // First try to get user from localStorage
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      // Verify the stored user is still valid
+      const response = await axios.get(`${API_ENDPOINTS.auth}/me`);
+      if (response.data) {
+        return response.data;
+      }
+    }
 
-    const response = await axios.get(`${API_ENDPOINTS.auth}/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return response.data;
+    // If no stored user or invalid, try to get from server
+    const response = await axios.get(`${API_ENDPOINTS.auth}/me`);
+    if (response.data) {
+      localStorage.setItem("user", JSON.stringify(response.data));
+      return response.data;
+    }
+
+    return null;
   } catch (error) {
     console.error("Get current user error:", error);
+    // Clear stored data if there's an error
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
     return null;
   }
 };

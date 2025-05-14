@@ -21,15 +21,20 @@ const __dirname = dirname(__filename);
 // Create Express app
 const app = express();
 
-// Middleware
+// CORS configuration with credentials support
 app.use(
   cors({
-    origin: config.frontend.url,
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: ["set-cookie"],
   })
 );
+
+// Enable pre-flight requests for all routes
+app.options("*", cors());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
