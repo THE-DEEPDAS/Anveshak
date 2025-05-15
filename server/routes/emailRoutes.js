@@ -26,24 +26,26 @@ router.post("/generate", async (req, res) => {
       return res.status(404).json({ message: "Resume not found" });
     }
 
-    // Validate resume has required data
-    if (!resume.skills?.length || !resume.projects?.length) {
+    // Validate resume has required data - either skills or experience
+    if (!resume.skills?.length && !resume.experience?.length) {
       return res.status(400).json({
-        message: "Resume must have skills and projects to generate emails",
+        message:
+          "Resume must have either skills or experience to generate emails",
       });
     }
 
     switch (action) {
       case "find-companies":
-        // Find matching companies based on skills and projects
+        // Find matching companies based on skills and/or experience
         const matchingCompanies = await findCompaniesForSkills(
-          resume.skills,
-          resume.projects
+          resume.skills || [],
+          resume.experience || [],
+          resume.projects || []
         );
 
         if (!matchingCompanies?.length) {
           return res.status(404).json({
-            message: "No matching companies found for your skills and projects",
+            message: "No matching companies found for your profile",
           });
         }
 

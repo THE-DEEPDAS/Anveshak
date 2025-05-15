@@ -268,64 +268,53 @@ export const researchCompany = async (companyName) => {
 };
 
 // Enhanced company search with role matching
-export const findCompaniesForSkills = async (skills, projects) => {
+export const findCompaniesForSkills = async (
+  skills = [],
+  experience = [],
+  projects = []
+) => {
   if (!genAI) return getMockCompanies();
 
   try {
     const model = getModel();
-    const skillsStr = skills.join(", ");
-    const projectsStr = projects.join("\n");
 
-    const prompt = `
-      Based on the following:
-      Skills: ${skillsStr}
-      Projects: ${projectsStr}
+    // Combine skills and experience into a profile
+    const profile = {
+      skills: skills.join(", "),
+      experience: experience.join("\n"),
+      projects: projects.join("\n"),
+    };
+
+    const prompt = `Find matching companies for a candidate with the following profile:
+      ${profile.skills ? `Skills: ${profile.skills}` : ""}
+      ${profile.experience ? `Experience:\n${profile.experience}` : ""}
+      ${profile.projects ? `Projects:\n${profile.projects}` : ""}
       
-      Find 5-7 real companies where someone with these skills and projects might find an internship.
-      Focus on companies that:
-      1. Use similar technologies
-      2. Have projects/products aligned with the candidate's experience
-      3. Are known to hire interns or junior developers
+      Return a list of companies that would be a good fit based on their tech stack, projects, and culture.
+      Each company should include:
+      - name: Company name
+      - email: HR or recruiting email
+      - role: Suitable role for the candidate
+      - matchReason: Why this company is a good match
       
-      For each company, provide:
-      1. Company name
-      2. Most relevant email contact (prefer engineering/hiring manager over generic HR)
-      3. Specific role that matches these skills
-      4. Brief reason why this company is a good match
-      
-      Return as a JSON array of objects with properties: name, email, role, matchReason
-      Do not include any other text or explanation.
-    `;
+      Return as JSON array.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const responseText = response.text();
 
-    let companies;
     try {
       const jsonMatch =
         responseText.match(/```json\n([\s\S]*)\n```/) ||
         responseText.match(/```\n([\s\S]*)\n```/);
-
       if (jsonMatch && jsonMatch[1]) {
-        companies = JSON.parse(jsonMatch[1]);
-      } else {
-        companies = JSON.parse(responseText);
+        return JSON.parse(jsonMatch[1]);
       }
+      return JSON.parse(responseText);
     } catch (parseError) {
       console.error("Error parsing AI response:", parseError);
       return getMockCompanies();
     }
-
-    // Enhance with company research
-    const companiesWithResearch = await Promise.all(
-      companies.map(async (company) => {
-        const research = await researchCompany(company.name);
-        return { ...company, research };
-      })
-    );
-
-    return companiesWithResearch;
   } catch (error) {
     console.error("Error finding companies:", error);
     return getMockCompanies();
