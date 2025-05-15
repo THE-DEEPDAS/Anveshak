@@ -18,9 +18,15 @@ export const getSkillsFromText = async (text) => {
   try {
     const model = getModel();
     const prompt = `
-      Extract a list of technical skills from the following resume text. 
-      Return ONLY an array of strings with no other text or explanation.
-      Resume: ${text}
+      Extract technical skills from the following resume text.
+      - Look for sections labeled "Skills", "Technical Skills", "Technologies", etc.
+      - For sections with bullet points or comma-separated lists, extract those directly
+      - For skills written in sentences, extract individual technical terms
+      - Remove common words and focus on technical terms, tools, frameworks, and languages
+      - Return ONLY an array of strings with no other text or explanation
+      
+      Resume text:
+      ${text}
     `;
 
     const result = await model.generateContent(prompt);
@@ -35,11 +41,24 @@ export const getSkillsFromText = async (text) => {
       const itemsText = `[${cleanedText}]`;
       skills = JSON.parse(itemsText);
     } catch (parseError) {
-      // Fallback to simple string splitting
-      skills = responseText.split(",").map((skill) => skill.trim());
+      // Enhanced fallback parsing
+      skills = responseText
+        .split(/[,\n]/) // Split by commas or newlines
+        .map((skill) =>
+          skill
+            .replace(/[^\w\s-+#]/g, "") // Remove special chars except -, +, #
+            .trim()
+        )
+        .filter(
+          (skill) =>
+            skill &&
+            skill.length >= 2 && // Must be at least 2 chars
+            !/^(and|or|in|with|using|including)$/i.test(skill) // Filter common connecting words
+        );
     }
 
-    return skills.filter(Boolean);
+    // Remove duplicates and empty values
+    return [...new Set(skills.filter(Boolean))];
   } catch (error) {
     console.error("Error extracting skills with AI:", error);
     return getMockSkills();

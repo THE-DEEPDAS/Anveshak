@@ -106,6 +106,186 @@ const getFileFromCloudinary = async (publicId, retries = 3) => {
 // Export the URL generation function for use in other modules
 export { generatePdfUrl };
 
+// Helper to extract sections using various common section names and formats
+const extractSection = (text, sectionNames) => {
+  const sections = [];
+  const lines = text.split("\n");
+  let currentSection = null;
+  let sectionContent = [];
+
+  // Normalize the text by removing excessive spaces and special characters
+  const normalizeText = (str) => str.replace(/\s+/g, " ").trim();
+
+  const isHeading = (line) => {
+    // Check if line is likely a heading (all caps, ends with :, etc)
+    const normalized = normalizeText(line).toLowerCase();
+    return sectionNames.some(
+      (name) =>
+        normalized === name.toLowerCase() ||
+        normalized.includes(name.toLowerCase() + ":") ||
+        normalized.startsWith(name.toLowerCase() + " ") ||
+        normalized.endsWith(" " + name.toLowerCase())
+    );
+  };
+
+  for (let line of lines) {
+    line = normalizeText(line);
+    if (!line) continue;
+
+    // Check if this line is a section heading
+    if (isHeading(line)) {
+      // If we were collecting content for a previous section, save it
+      if (currentSection && sectionContent.length) {
+        sections.push({
+          name: currentSection,
+          content: sectionContent.join("\n"),
+        });
+      }
+      currentSection = line;
+      sectionContent = [];
+    } else if (currentSection) {
+      // Add line to current section if it's not just whitespace
+      if (line.trim()) {
+        sectionContent.push(line);
+      }
+    }
+  }
+
+  // Don't forget to add the last section
+  if (currentSection && sectionContent.length) {
+    sections.push({
+      name: currentSection,
+      content: sectionContent.join("\n"),
+    });
+  }
+
+  return sections;
+};
+
+// Extract skills from text looking for various formats
+const extractSkills = (text) => {
+  const skillSectionNames = [
+    "SKILLS",
+    "TECHNICAL SKILLS",
+    "CORE COMPETENCIES",
+    "TECHNOLOGIES",
+    "TECHNICAL EXPERTISE",
+    "TOOLS & TECHNOLOGIES",
+    "PROGRAMMING LANGUAGES",
+    "EXPERTISE",
+    "PROFICIENCIES",
+    "COMPUTER SKILLS",
+    "KEY SKILLS",
+  ];
+
+  const sections = extractSection(text, skillSectionNames);
+  let skills = new Set();
+
+  sections.forEach((section) => {
+    // Split by common delimiters and clean up
+    const extracted = section.content
+      .replace(/[•●*]/g, ",") // Replace bullets with commas
+      .replace(/[|┃│⎪⎥⎢⎜]/g, ",") // Replace vertical bars with commas
+      .split(/[,;•]/) // Split by common delimiters
+      .map((skill) => skill.trim())
+      .filter(
+        (skill) =>
+          skill &&
+          skill.length >= 2 &&
+          !/^(and|or|in|with|using|including)$/i.test(skill)
+      );
+
+    extracted.forEach((skill) => skills.add(skill));
+  });
+
+  return Array.from(skills);
+};
+
+// Extract experience sections with various common section names
+const extractExperience = (text) => {
+  const experienceSectionNames = [
+    "EXPERIENCE",
+    "WORK EXPERIENCE",
+    "PROFESSIONAL EXPERIENCE",
+    "EMPLOYMENT HISTORY",
+    "WORK HISTORY",
+    "CAREER HISTORY",
+    "RELEVANT EXPERIENCE",
+    "PROFESSIONAL BACKGROUND",
+  ];
+
+  const sections = extractSection(text, experienceSectionNames);
+  return sections.map((section) => section.content);
+};
+
+// Extract projects with various common section names and formats
+const extractProjects = (text) => {
+  const projectSectionNames = [
+    "PROJECTS",
+    "PROJECT EXPERIENCE",
+    "TECHNICAL PROJECTS",
+    "PERSONAL PROJECTS",
+    "KEY PROJECTS",
+    "ACADEMIC PROJECTS",
+    "RELEVANT PROJECTS",
+    "FEATURED PROJECTS",
+    "MAJOR PROJECTS",
+    "RESEARCH PROJECTS",
+    "DEVELOPMENT PROJECTS",
+    "INDIVIDUAL PROJECTS",
+  ];
+
+  const sections = extractSection(text, projectSectionNames);
+  let projects = [];
+
+  sections.forEach((section) => {
+    // Split content into individual projects
+    let projectItems = [];
+    let currentProject = [];
+    const lines = section.content.split("\n");
+
+    for (let line of lines) {
+      line = line.trim();
+      if (!line) continue;
+
+      // Check if this line starts a new project (common patterns)
+      const isNewProject =
+        /^[•●\-*]/.test(line) || // Bullet points
+        /^\d+[\.\)]/.test(line) || // Numbered lists
+        /^[\[\(\{]/.test(line) || // Starts with bracket/brace
+        /^(Project|System|Application)[\s\d]*:/.test(line) || // Project headers
+        (line.length > 10 && /^[A-Z][^a-z]{2,}/.test(line)); // All caps title
+
+      if (isNewProject && currentProject.length > 0) {
+        projectItems.push(currentProject.join(" ").trim());
+        currentProject = [];
+      }
+      currentProject.push(line);
+    }
+
+    // Don't forget to add the last project
+    if (currentProject.length > 0) {
+      projectItems.push(currentProject.join(" ").trim());
+    }
+
+    // Clean up each project description
+    projectItems.forEach((project) => {
+      // Remove bullet points and common prefixes
+      let cleaned = project
+        .replace(/^[•●\-*\d\.\)\[\]\{\}]+\s*/, "")
+        .replace(/^(Project|System|Application)[\s\d]*:/, "")
+        .trim();
+
+      // Only add if it looks like a valid project (has some substance)
+      if (cleaned.length > 10 && !/^(and|or|using|with)$/i.test(cleaned)) {
+        projects.push(cleaned);
+      }
+    });
+  });
+
+  return projects;
+};
+
 export const parseResumeText = async (publicId, previousVersion = null) => {
   let dataBuffer = null;
 
@@ -128,10 +308,6 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
         dataBuffer.length,
         "bytes"
       );
-
-      if (dataBuffer.length < 100) {
-        throw new Error("Downloaded file is too small to be a valid PDF");
-      }
     } catch (downloadError) {
       console.error(
         "Error downloading from Cloudinary:",
@@ -145,7 +321,7 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
     console.log("Attempting to parse PDF data...");
     const data = await pdfParse(dataBuffer, {
       max: 0,
-      timeout: 30000, // 30 second timeout for parsing
+      timeout: 30000,
       pagerender: function (pageData) {
         let render_options = {
           normalizeWhitespace: false,
@@ -162,20 +338,33 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
     const text = data.text.trim();
     console.log("Successfully extracted text, length:", text.length);
 
-    if (text.length < 50) {
-      throw new Error("Extracted text is too short to be a valid resume");
+    // More lenient minimum length check
+    if (text.length < 20) {
+      throw new Error("Extracted text is too short to be valid content");
     }
 
-    // Extract information using AI
-    const [skills, experience, projects] = await Promise.all([
-      getSkillsFromText(text, previousVersion?.skills),
-      getExperienceFromText(text, previousVersion?.experience),
-      getProjectsFromText(text, previousVersion?.projects),
-    ]);
+    // Extract information using the new parsing functions
+    const skills = extractSkills(text);
+    const experience = extractExperience(text);
+    const projects = extractProjects(text);
 
-    // Validate the parsed data
-    if (!skills?.length && !experience?.length && !projects?.length) {
-      throw new Error("No relevant content extracted from PDF");
+    // If no sections were found with standard names, try AI parsing as fallback
+    if (!skills.length && !experience.length && !projects.length) {
+      console.log(
+        "No sections found with standard parsing, trying AI parsing..."
+      );
+      const [aiSkills, aiExperience, aiProjects] = await Promise.all([
+        getSkillsFromText(text, previousVersion?.skills),
+        getExperienceFromText(text, previousVersion?.experience),
+        getProjectsFromText(text, previousVersion?.projects),
+      ]);
+
+      return {
+        skills: aiSkills || [],
+        experience: aiExperience || [],
+        projects: aiProjects || [],
+        parsedAt: new Date(),
+      };
     }
 
     return {

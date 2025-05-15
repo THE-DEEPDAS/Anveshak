@@ -1,6 +1,12 @@
 import React from "react";
 import { useAppContext } from "../../context/AppContext";
-import { FaFileDownload, FaCode, FaBriefcase, FaSpinner } from "react-icons/fa";
+import {
+  FaFileDownload,
+  FaCode,
+  FaBriefcase,
+  FaSpinner,
+  FaLightbulb,
+} from "react-icons/fa";
 
 const ResumeAnalysis = () => {
   const { resume } = useAppContext();
@@ -119,38 +125,29 @@ const ResumeAnalysis = () => {
             )}
           </div>
 
-          {resume.projects && resume.projects.length > 0 && (
-            <div className="md:col-span-2 bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 shadow-sm">
-              <div className="flex items-center mb-4">
-                <svg
-                  className="text-green-600 w-6 h-6 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                  />
-                </svg>
-                <h3 className="text-xl font-semibold text-gray-800">
-                  Projects
-                </h3>
-              </div>
+          <div className="md:col-span-2 bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 shadow-sm">
+            <div className="flex items-center mb-4">
+              <FaLightbulb className="text-green-600 text-xl mr-2" />
+              <h3 className="text-xl font-semibold text-gray-800">Projects</h3>
+            </div>
+            {resume.projects && resume.projects.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {resume.projects.map((project, index) => (
                   <div
                     key={index}
-                    className="bg-white p-4 rounded-lg shadow-sm border border-green-100"
+                    className="bg-white p-4 rounded-lg shadow-sm border border-green-100 hover:shadow-md transition-shadow"
                   >
-                    <p className="text-gray-700">{project}</p>
+                    <h4 className="font-medium text-gray-900 mb-2">
+                      Project {index + 1}
+                    </h4>
+                    <p className="text-gray-700 text-sm">{project}</p>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-gray-500">No projects detected</p>
+            )}
+          </div>
         </div>
       )}
     </div>
