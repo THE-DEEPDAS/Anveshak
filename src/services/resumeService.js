@@ -10,10 +10,24 @@ export const uploadResume = async (formData) => {
         headers: {
           "Content-Type": "multipart/form-data",
         },
+        timeout: 60000, // 60 second timeout
+        maxContentLength: 10 * 1024 * 1024, // 10MB
+        maxBodyLength: 10 * 1024 * 1024, // 10MB
+        onUploadProgress: (progressEvent) => {
+          console.log(
+            "Upload Progress:",
+            Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          );
+        },
       }
     );
     return response.data;
   } catch (error) {
+    if (error.code === "ECONNABORTED") {
+      throw new Error(
+        "Upload timed out. Please try again with a smaller file or check your connection."
+      );
+    }
     console.error("Error uploading resume:", error);
     throw error;
   }

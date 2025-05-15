@@ -27,9 +27,19 @@ axios.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const isLoginPage = window.location.pathname === "/login";
+    const isRefreshRequest = originalRequest.url === "/auth/refresh-token";
 
-    // If the error is due to an expired token
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Don't retry if:
+    // 1. It's already a refresh token request
+    // 2. We're on the login page
+    // 3. The request has already been retried
+    if (
+      error.response?.status === 401 &&
+      !isRefreshRequest &&
+      !isLoginPage &&
+      !originalRequest._retry
+    ) {
       originalRequest._retry = true;
 
       try {
@@ -47,15 +57,16 @@ axios.interceptors.response.use(
         // If refresh token fails, clean up and redirect to login
         localStorage.removeItem("user");
         localStorage.removeItem("token");
+        delete axios.defaults.headers.common["Authorization"];
 
-        // Redirect to login if not already there
-        if (window.location.pathname !== "/login") {
+        // Only redirect if we're not already on the login page
+        if (!isLoginPage) {
           window.location.href = "/login";
         }
+        return Promise.reject(refreshError);
       }
     }
 
-    // If the error is not 401 or refresh fails, reject the promise
     return Promise.reject(error);
   }
 );

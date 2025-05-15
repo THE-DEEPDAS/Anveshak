@@ -9,8 +9,19 @@ export const useAppContext = () => useContext(AppContext);
 export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [resume, setResume] = useState(() => {
-    const stored = localStorage.getItem("resume");
-    return stored ? JSON.parse(stored) : null;
+    try {
+      const stored = localStorage.getItem("resume");
+      const parsedResume = stored ? JSON.parse(stored) : null;
+      // Validate resume data
+      if (parsedResume && parsedResume.id && parsedResume.url) {
+        return parsedResume;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error parsing stored resume:", error);
+      localStorage.removeItem("resume");
+      return null;
+    }
   });
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,6 +48,15 @@ export const AppProvider = ({ children }) => {
 
     initializeAuth();
   }, [location.pathname]);
+
+  // Save resume to localStorage when it changes
+  useEffect(() => {
+    if (resume) {
+      localStorage.setItem("resume", JSON.stringify(resume));
+    } else {
+      localStorage.removeItem("resume");
+    }
+  }, [resume]);
 
   const contextValue = {
     user,
