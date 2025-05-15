@@ -64,15 +64,14 @@ configureCloudinary();
 
 // Generate authenticated PDF URL helper
 const generatePdfUrl = (publicId) => {
-  const version = Math.floor(Date.now() / 1000); // This creates a version number
-  const cloudConfig = cloudinary.config();
-
-  // Construct the URL in the correct format
-  return `https://res.cloudinary.com/${cloudConfig.cloud_name}/raw/upload/v${version}/${publicId}`;
+  // The publicId already includes the folder path and filename
+  return `https://res.cloudinary.com/${
+    cloudinary.config().cloud_name
+  }/raw/upload/v1/${publicId}`;
 };
 
-// Get file from Cloudinary using signed URL
-const getFileFromCloudinary = async (publicId) => {
+// Get file from Cloudinary using signed URL with retries
+const getFileFromCloudinary = async (publicId, retries = 3) => {
   try {
     const url = generatePdfUrl(publicId);
     console.log("Downloading from signed URL:", url);
@@ -81,8 +80,8 @@ const getFileFromCloudinary = async (publicId) => {
       method: "get",
       url: url,
       responseType: "arraybuffer",
-      maxContentLength: 10 * 1024 * 1024,
-      timeout: 30000,
+      maxContentLength: 10 * 1024 * 1024, // 10MB max
+      timeout: 30000, // 30 second timeout per attempt
       headers: {
         Accept: "application/pdf",
       },
@@ -95,9 +94,10 @@ const getFileFromCloudinary = async (publicId) => {
     return response.data;
   } catch (error) {
     console.error("Error fetching file from Cloudinary:", error);
-    if (error.response) {
-      console.error("Response status:", error.response.status);
-      console.error("Response headers:", error.response.headers);
+    if (retries > 0) {
+      console.log(`Retrying download, ${retries} attempts remaining...`);
+      await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+      return getFileFromCloudinary(publicId, retries - 1);
     }
     throw error;
   }
@@ -114,14 +114,9 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
       throw new Error("Cloudinary public ID is required");
     }
 
-    const cleanPublicId = publicId.replace(/\.pdf$/, "");
-
     try {
-      console.log(
-        "Downloading from Cloudinary using public ID:",
-        cleanPublicId
-      );
-      const fileData = await getFileFromCloudinary(cleanPublicId);
+      console.log("Downloading from Cloudinary using public ID:", publicId);
+      const fileData = await getFileFromCloudinary(publicId);
 
       if (!fileData) {
         throw new Error("No data received from Cloudinary");
@@ -135,7 +130,6 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
       );
 
       if (dataBuffer.length < 100) {
-        // Basic sanity check
         throw new Error("Downloaded file is too small to be a valid PDF");
       }
     } catch (downloadError) {
@@ -151,6 +145,7 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
     console.log("Attempting to parse PDF data...");
     const data = await pdfParse(dataBuffer, {
       max: 0,
+      timeout: 30000, // 30 second timeout for parsing
       pagerender: function (pageData) {
         let render_options = {
           normalizeWhitespace: false,
@@ -158,7 +153,6 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
         };
         return pageData.getTextContent(render_options);
       },
-      version: "v2.0.0",
     });
 
     if (!data || !data.text) {
@@ -169,7 +163,6 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
     console.log("Successfully extracted text, length:", text.length);
 
     if (text.length < 50) {
-      // Basic sanity check
       throw new Error("Extracted text is too short to be a valid resume");
     }
 

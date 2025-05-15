@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
+import compression from "compression";
 import { config } from "./config/config.js";
 
 // Routes
@@ -21,16 +22,29 @@ const __dirname = dirname(__filename);
 // Create Express app
 const app = express();
 
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(cookieParser());
+app.use(cors(config.cors));
+
+// Increase timeout for all routes
+app.use((req, res, next) => {
+  res.setTimeout(300000, () => {
+    console.log("Request has timed out.");
+    res.status(408).send("Request has timed out");
+  });
+  next();
+});
+
+// Enable gzip compression
+app.use(compression());
+
 // CORS configuration
 app.use(cors(config.cors));
 
 // Enable pre-flight requests for all routes
 app.options("*", cors(config.cors));
-
-// Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
 
 // Custom morgan format to minimize console noise
 app.use(

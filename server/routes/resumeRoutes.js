@@ -31,13 +31,17 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    cb(null, Date.now() + "-" + file.originalname);
+    const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_");
+    cb(null, Date.now() + "-" + sanitizedName);
   },
 });
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fieldSize: 10 * 1024 * 1024, // 10MB field size limit
+  },
   fileFilter: (req, file, cb) => {
     if (file.mimetype === "application/pdf") {
       cb(null, true);
@@ -45,19 +49,25 @@ const upload = multer({
       cb(new Error("Only PDF files are allowed"), false);
     }
   },
-});
+}).single("resume");
 
 const router = express.Router();
 
-// Upload resume
-router.post(
-  "/upload",
-  authenticateToken,
-  upload.single("resume"),
-  async (req, res) => {
-    try {
-      console.log("User from token:", req.user); // Debug log
+// Upload resume with custom error handling
+router.post("/upload", authenticateToken, (req, res) => {
+  upload(req, res, async (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res
+          .status(413)
+          .json({ error: "File size too large. Maximum size is 10MB" });
+      }
+      return res.status(400).json({ error: err.message });
+    } else if (err) {
+      return res.status(400).json({ error: err.message });
+    }
 
+    try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
@@ -68,17 +78,19 @@ router.post(
           .json({ error: "User not properly authenticated" });
       }
 
-      // Upload to Cloudinary with authentication
+      // Upload to Cloudinary with better configuration
       const result = await cloudinary.uploader.upload(req.file.path, {
         resource_type: "raw",
-        public_id: `${req.file.originalname}`,
+        public_id: req.file.filename,
         folder: `resumes/${req.user.userId}`,
         use_filename: true,
         unique_filename: true,
         type: "upload",
+        timeout: 120000, // 120 second timeout
+        chunk_size: 10000000, // 10MB chunks
+        eager_async: true,
+        eager_notification_url: null,
       });
-
-      console.log("Cloudinary upload result:", result);
 
       // Clean up local file
       fs.unlink(req.file.path, (err) => {
@@ -90,8 +102,8 @@ router.post(
         user: req.user.userId,
         filename: req.file.filename,
         originalFilename: req.file.originalname,
-        cloudinaryPublicId: result.public_id,
-        cloudinaryUrl: result.secure_url,
+        cloudinaryPublicId: result.public_id, // This should already include folder path
+        cloudinaryUrl: result.secure_url, // Use the direct secure URL from Cloudinary
         parseStatus: "pending",
       });
 
@@ -99,6 +111,7 @@ router.post(
 
       let parsedData;
       try {
+        // Pass the full public_id which includes the folder path
         parsedData = await parseResumeText(result.public_id);
         await resume.updateParseResults(parsedData);
       } catch (parseError) {
@@ -106,9 +119,7 @@ router.post(
         await resume.markParseFailed(parseError);
       }
 
-      // Generate URL using the shared function
-      const pdfUrl = generatePdfUrl(result.public_id);
-
+      // Use the actual secure_url from Cloudinary for consistency
       res.json({
         message:
           resume.parseStatus === "completed"
@@ -117,7 +128,7 @@ router.post(
         resumeId: resume._id,
         resume: {
           ...resume.toObject(),
-          url: pdfUrl,
+          url: result.secure_url,
         },
         parsingError: resume.parseError?.message,
       });
@@ -125,8 +136,8 @@ router.post(
       console.error("Resume upload error:", error);
       res.status(500).json({ error: "Error uploading resume" });
     }
-  }
-);
+  });
+});
 
 // Get resume by ID
 router.get("/:id", authenticateToken, async (req, res) => {

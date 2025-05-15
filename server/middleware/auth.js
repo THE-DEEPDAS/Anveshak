@@ -12,7 +12,12 @@ export const authenticateToken = (req, res, next) => {
     // Use cookie token if available, otherwise use header token
     const token = cookieToken || headerToken;
 
-    if (!token) {
+    // For refresh token endpoint, only proceed if there's a token
+    if (req.path === "/refresh-token") {
+      if (!token) {
+        return res.status(401).json({ message: "No token provided" });
+      }
+    } else if (!token) {
       return res
         .status(401)
         .json({ message: "Access denied. No token provided." });
@@ -29,11 +34,15 @@ export const authenticateToken = (req, res, next) => {
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
       });
-      return res
-        .status(401)
-        .json({ message: "Token expired. Please login again." });
+      return res.status(401).json({ message: "Token expired" });
     }
-    res.status(401).json({ message: "Invalid token" });
+    // For any other error in token verification
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    });
+    return res.status(401).json({ message: "Invalid token" });
   }
 };
 
