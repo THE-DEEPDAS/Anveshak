@@ -3,6 +3,7 @@ import {
   getSkillsFromText,
   getExperienceFromText,
   getProjectsFromText,
+  parseResumeWithAI,
 } from "./aiService.js";
 import axios from "axios";
 import { v2 as cloudinary } from "cloudinary";
@@ -106,33 +107,50 @@ const getFileFromCloudinary = async (publicId, retries = 3) => {
 // Export the URL generation function for use in other modules
 export { generatePdfUrl };
 
-// Helper to extract sections using various common section names and formats
+// Helper to extract sections with more flexible detection
 const extractSection = (text, sectionNames) => {
   const sections = [];
   const lines = text.split("\n");
   let currentSection = null;
   let sectionContent = [];
 
-  // Normalize the text by removing excessive spaces and special characters
-  const normalizeText = (str) => str.replace(/\s+/g, " ").trim();
+  // Normalize text and remove special characters but keep periods and commas
+  const normalizeText = (str) =>
+    str
+      .replace(/[^\w\s,\.:-]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
 
   const isHeading = (line) => {
-    // Check if line is likely a heading (all caps, ends with :, etc)
     const normalized = normalizeText(line).toLowerCase();
-    return sectionNames.some(
-      (name) =>
-        normalized === name.toLowerCase() ||
-        normalized.includes(name.toLowerCase() + ":") ||
-        normalized.startsWith(name.toLowerCase() + " ") ||
-        normalized.endsWith(" " + name.toLowerCase())
-    );
+    // More flexible heading detection
+    return sectionNames.some((name) => {
+      const normalizedName = name.toLowerCase();
+      return (
+        normalized === normalizedName ||
+        normalized.includes(normalizedName + ":") ||
+        normalized.startsWith(normalizedName + " ") ||
+        normalized.endsWith(" " + normalizedName) ||
+        // Check for variations like "technical-skills" or "technical_skills"
+        normalized.replace(/[-_]/g, " ").includes(normalizedName) ||
+        // Check for partial matches with common prefixes/suffixes
+        normalized.includes(normalizedName.replace("experience", "").trim()) ||
+        normalized.includes(normalizedName.replace("skills", "").trim())
+      );
+    });
   };
 
-  for (let line of lines) {
-    line = normalizeText(line);
+  // Pre-process the text to handle different formats
+  const processedLines = lines.map((line) => {
+    // Remove bullet points and numbering
+    return line.replace(/^[\s•●\-*\d\.\)]+/, "").trim();
+  });
+
+  for (let i = 0; i < processedLines.length; i++) {
+    const line = processedLines[i];
     if (!line) continue;
 
-    // Check if this line is a section heading
+    // Look for section headers
     if (isHeading(line)) {
       // If we were collecting content for a previous section, save it
       if (currentSection && sectionContent.length) {
@@ -144,14 +162,30 @@ const extractSection = (text, sectionNames) => {
       currentSection = line;
       sectionContent = [];
     } else if (currentSection) {
-      // Add line to current section if it's not just whitespace
-      if (line.trim()) {
+      // Add context if it looks like content (not just whitespace or separator)
+      if (line.length > 1) {
         sectionContent.push(line);
+      }
+    } else {
+      // Try to detect unlabeled sections by looking at the next few lines
+      const nextLines = processedLines
+        .slice(i, i + 3)
+        .join(" ")
+        .toLowerCase();
+      if (
+        sectionNames.some(
+          (name) =>
+            nextLines.includes(name.toLowerCase()) ||
+            nextLines.includes(name.toLowerCase().replace("experience", "")) ||
+            nextLines.includes(name.toLowerCase().replace("skills", ""))
+        )
+      ) {
+        currentSection = line;
       }
     }
   }
 
-  // Don't forget to add the last section
+  // Add the last section
   if (currentSection && sectionContent.length) {
     sections.push({
       name: currentSection,
@@ -162,7 +196,7 @@ const extractSection = (text, sectionNames) => {
   return sections;
 };
 
-// Extract skills from text looking for various formats
+// Enhanced skill extraction with better pattern recognition
 const extractSkills = (text) => {
   const skillSectionNames = [
     "SKILLS",
@@ -176,32 +210,99 @@ const extractSkills = (text) => {
     "PROFICIENCIES",
     "COMPUTER SKILLS",
     "KEY SKILLS",
+    "TECHNICAL",
+    "TECHNOLOGIES USED",
+    "LANGUAGES",
+    "FRAMEWORKS",
   ];
 
-  const sections = extractSection(text, skillSectionNames);
+  // Additional technical terms to look for
+  const technicalTerms = [
+    "programming",
+    "software",
+    "development",
+    "web",
+    "database",
+    "frontend",
+    "backend",
+    "full stack",
+    "api",
+    "cloud",
+  ];
+
+  const sections = extractSection(text, [
+    ...skillSectionNames,
+    ...technicalTerms,
+  ]);
   let skills = new Set();
 
+  // Process each section
   sections.forEach((section) => {
-    // Split by common delimiters and clean up
-    const extracted = section.content
+    const content = section.content
       .replace(/[•●*]/g, ",") // Replace bullets with commas
-      .replace(/[|┃│⎪⎥⎢⎜]/g, ",") // Replace vertical bars with commas
-      .split(/[,;•]/) // Split by common delimiters
-      .map((skill) => skill.trim())
+      .replace(/[|┃│⎪⎥⎢⎜]/g, ",") // Replace vertical bars
+      .replace(/[:]/g, ",") // Replace colons
+      .replace(/[-]/g, " "); // Replace hyphens with spaces
+
+    // Split by multiple possible delimiters
+    const parts = content
+      .split(/[,;•\n]/)
+      .map((part) => part.trim())
       .filter(
-        (skill) =>
-          skill &&
-          skill.length >= 2 &&
-          !/^(and|or|in|with|using|including)$/i.test(skill)
+        (part) =>
+          part &&
+          part.length >= 2 &&
+          !/^(and|or|in|with|using|including)$/i.test(part)
       );
 
-    extracted.forEach((skill) => skills.add(skill));
+    parts.forEach((part) => skills.add(part));
   });
+
+  // If no skills found, try looking for technical terms in the entire text
+  if (skills.size === 0) {
+    const words = text
+      .split(/[\s,;:|•]/)
+      .map((word) => word.trim())
+      .filter((word) => word.length >= 2);
+
+    // Look for common programming terms
+    const commonTech = [
+      "java",
+      "python",
+      "javascript",
+      "typescript",
+      "react",
+      "node",
+      "angular",
+      "vue",
+      "css",
+      "html",
+      "sql",
+      "mongodb",
+      "aws",
+      "docker",
+      "kubernetes",
+      "git",
+      "api",
+      "rest",
+      "graphql",
+    ];
+
+    words.forEach((word) => {
+      if (
+        commonTech.some((tech) =>
+          word.toLowerCase().includes(tech.toLowerCase())
+        )
+      ) {
+        skills.add(word);
+      }
+    });
+  }
 
   return Array.from(skills);
 };
 
-// Extract experience sections with various common section names
+// Enhanced experience extraction
 const extractExperience = (text) => {
   const experienceSectionNames = [
     "EXPERIENCE",
@@ -212,13 +313,51 @@ const extractExperience = (text) => {
     "CAREER HISTORY",
     "RELEVANT EXPERIENCE",
     "PROFESSIONAL BACKGROUND",
+    "EMPLOYMENT",
+    "WORK",
+    "CAREER",
+    "INTERNSHIP",
+    "INTERNSHIPS",
+    "TRAINING",
+    "TRAINING AND INTERNSHIP",
+    "PROFESSIONAL TRAINING",
+    "VOLUNTEER EXPERIENCE",
   ];
 
   const sections = extractSection(text, experienceSectionNames);
-  return sections.map((section) => section.content);
+  let experiences = [];
+
+  sections.forEach((section) => {
+    const lines = section.content.split("\n");
+    let currentExp = [];
+
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+
+      // New experience entry indicators
+      const isNewEntry =
+        /^\d{4}/.test(trimmed) || // Starts with year
+        /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i.test(trimmed) || // Starts with month
+        /^[A-Z][^a-z]{2,}/.test(trimmed) || // All caps company name
+        trimmed.length > 20; // Long enough to be a title
+
+      if (isNewEntry && currentExp.length > 0) {
+        experiences.push(currentExp.join(" "));
+        currentExp = [];
+      }
+      currentExp.push(trimmed);
+    });
+
+    if (currentExp.length > 0) {
+      experiences.push(currentExp.join(" "));
+    }
+  });
+
+  return experiences;
 };
 
-// Extract projects with various common section names and formats
+// Enhanced project extraction
 const extractProjects = (text) => {
   const projectSectionNames = [
     "PROJECTS",
@@ -230,57 +369,41 @@ const extractProjects = (text) => {
     "RELEVANT PROJECTS",
     "FEATURED PROJECTS",
     "MAJOR PROJECTS",
-    "RESEARCH PROJECTS",
+    "PROJECT WORK",
     "DEVELOPMENT PROJECTS",
-    "INDIVIDUAL PROJECTS",
+    "SOFTWARE PROJECTS",
   ];
 
   const sections = extractSection(text, projectSectionNames);
   let projects = [];
 
   sections.forEach((section) => {
-    // Split content into individual projects
-    let projectItems = [];
-    let currentProject = [];
     const lines = section.content.split("\n");
+    let currentProject = [];
 
-    for (let line of lines) {
-      line = line.trim();
-      if (!line) continue;
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
 
-      // Check if this line starts a new project (common patterns)
+      // New project indicators
       const isNewProject =
-        /^[•●\-*]/.test(line) || // Bullet points
-        /^\d+[\.\)]/.test(line) || // Numbered lists
-        /^[\[\(\{]/.test(line) || // Starts with bracket/brace
-        /^(Project|System|Application)[\s\d]*:/.test(line) || // Project headers
-        (line.length > 10 && /^[A-Z][^a-z]{2,}/.test(line)); // All caps title
+        /^[•●\-*]/.test(trimmed) || // Bullet points
+        /^\d+[\.\)]/.test(trimmed) || // Numbered lists
+        /^[\[\(\{]/.test(trimmed) || // Brackets/braces
+        /^(Project|System|Application|Website)[\s\d]*:/.test(trimmed) || // Project headers
+        /^[A-Z][^a-z]{2,}/.test(trimmed) || // All caps title
+        trimmed.length > 30; // Long project title
 
       if (isNewProject && currentProject.length > 0) {
-        projectItems.push(currentProject.join(" ").trim());
+        projects.push(currentProject.join(" "));
         currentProject = [];
       }
-      currentProject.push(line);
-    }
-
-    // Don't forget to add the last project
-    if (currentProject.length > 0) {
-      projectItems.push(currentProject.join(" ").trim());
-    }
-
-    // Clean up each project description
-    projectItems.forEach((project) => {
-      // Remove bullet points and common prefixes
-      let cleaned = project
-        .replace(/^[•●\-*\d\.\)\[\]\{\}]+\s*/, "")
-        .replace(/^(Project|System|Application)[\s\d]*:/, "")
-        .trim();
-
-      // Only add if it looks like a valid project (has some substance)
-      if (cleaned.length > 10 && !/^(and|or|using|with)$/i.test(cleaned)) {
-        projects.push(cleaned);
-      }
+      currentProject.push(trimmed);
     });
+
+    if (currentProject.length > 0) {
+      projects.push(currentProject.join(" "));
+    }
   });
 
   return projects;
@@ -288,46 +411,22 @@ const extractProjects = (text) => {
 
 export const parseResumeText = async (publicId, previousVersion = null) => {
   let dataBuffer = null;
-
   try {
-    if (!publicId) {
-      throw new Error("Cloudinary public ID is required");
-    }
+    // Get PDF from Cloudinary
+    const result = await cloudinary.api.resource(publicId, {
+      resource_type: "raw",
+    });
 
-    try {
-      console.log("Downloading from Cloudinary using public ID:", publicId);
-      const fileData = await getFileFromCloudinary(publicId);
+    // Download PDF
+    const response = await axios.get(result.secure_url, {
+      responseType: "arraybuffer",
+    });
+    dataBuffer = Buffer.from(response.data);
 
-      if (!fileData) {
-        throw new Error("No data received from Cloudinary");
-      }
-
-      dataBuffer = Buffer.from(fileData);
-      console.log(
-        "Successfully downloaded PDF, size:",
-        dataBuffer.length,
-        "bytes"
-      );
-    } catch (downloadError) {
-      console.error(
-        "Error downloading from Cloudinary:",
-        downloadError.message
-      );
-      throw new Error(
-        `Failed to download file from Cloudinary: ${downloadError.message}`
-      );
-    }
-
-    console.log("Attempting to parse PDF data...");
+    // Parse PDF
     const data = await pdfParse(dataBuffer, {
-      max: 0,
-      timeout: 30000,
-      pagerender: function (pageData) {
-        let render_options = {
-          normalizeWhitespace: false,
-          disableCombineTextItems: false,
-        };
-        return pageData.getTextContent(render_options);
+      pagerender: (pageData) => {
+        return pageData.getTextContent({ normalizeWhitespace: true });
       },
     });
 
@@ -336,43 +435,89 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
     }
 
     const text = data.text.trim();
-    console.log("Successfully extracted text, length:", text.length);
-
-    // More lenient minimum length check
-    if (text.length < 20) {
-      throw new Error("Extracted text is too short to be valid content");
-    }
-
-    // Extract information using the new parsing functions
-    const skills = extractSkills(text);
-    const experience = extractExperience(text);
-    const projects = extractProjects(text);
-
-    // If no sections were found with standard names, try AI parsing as fallback
-    if (!skills.length && !experience.length && !projects.length) {
-      console.log(
-        "No sections found with standard parsing, trying AI parsing..."
-      );
-      const [aiSkills, aiExperience, aiProjects] = await Promise.all([
-        getSkillsFromText(text, previousVersion?.skills),
-        getExperienceFromText(text, previousVersion?.experience),
-        getProjectsFromText(text, previousVersion?.projects),
-      ]);
-
+    if (text.length < 10) {
       return {
-        skills: aiSkills || [],
-        experience: aiExperience || [],
-        projects: aiProjects || [],
+        text,
+        skills: [],
+        experience: [],
+        projects: [],
         parsedAt: new Date(),
+        parseMethod: "failed",
+        warning: "Extracted text is too short to parse meaningfully",
       };
     }
 
-    return {
-      skills,
-      experience,
-      projects,
-      parsedAt: new Date(),
-    };
+    console.log("Successfully extracted text, length:", text.length);
+
+    // 1. Try regular parsing first
+    console.log("Attempting regular parsing...");
+    const regularSkills = extractSkills(text);
+    const regularExperience = extractExperience(text);
+    const regularProjects = extractProjects(text);
+
+    if (
+      regularSkills.length > 0 ||
+      regularExperience.length > 0 ||
+      regularProjects.length > 0
+    ) {
+      console.log("Regular parsing successful");
+      return {
+        text,
+        skills: regularSkills,
+        experience: regularExperience,
+        projects: regularProjects,
+        parsedAt: new Date(),
+        parseMethod: "regular",
+      };
+    }
+
+    // 2. If regular parsing found no content, try AI parsing
+    console.log("Regular parsing found minimal content, trying AI parsing...");
+    try {
+      const aiResult = await parseResumeWithAI(text);
+      if (
+        aiResult &&
+        (aiResult.skills?.length > 0 ||
+          aiResult.experience?.length > 0 ||
+          aiResult.projects?.length > 0)
+      ) {
+        console.log("AI parsing successful");
+        return {
+          text,
+          ...aiResult,
+          parsedAt: new Date(),
+          parseMethod: "ai",
+        };
+      } else {
+        // AI parsing attempted but returned no content
+        const warningMessage =
+          "Parsing completed but found limited content. You can manually add your skills and experience.";
+        console.warn(warningMessage);
+        return {
+          text,
+          skills: aiResult?.skills || [],
+          experience: aiResult?.experience || [],
+          projects: aiResult?.projects || [],
+          parsedAt: new Date(),
+          parseMethod: "partial",
+          warning: warningMessage,
+        };
+      }
+    } catch (aiError) {
+      const warningMessage =
+        "Automated parsing had difficulties. You can manually add your skills and experience.";
+      console.warn(warningMessage);
+      // Return what we have with a warning
+      return {
+        text,
+        skills: [],
+        experience: [],
+        projects: [],
+        parsedAt: new Date(),
+        parseMethod: "manual_required",
+        warning: warningMessage,
+      };
+    }
   } catch (error) {
     console.error("Resume parsing error:", error);
     throw error;

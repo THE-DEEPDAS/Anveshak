@@ -32,6 +32,7 @@ const resumeSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    text: { type: String }, // Store raw extracted text
     skills: [{ type: String, trim: true }],
     experience: [{ type: String, trim: true }],
     projects: [{ type: String, trim: true }],
@@ -53,6 +54,7 @@ const resumeSchema = new mongoose.Schema(
       message: String,
       timestamp: Date,
     },
+    warning: { type: String }, // Store parsing warnings
     createdAt: {
       type: Date,
       default: Date.now,
@@ -73,10 +75,17 @@ resumeSchema.index({ cloudinaryPublicId: 1 }, { unique: true });
 
 // Method to update parse results
 resumeSchema.methods.updateParseResults = function (parseResults) {
-  this.skills = parseResults.skills;
-  this.experience = parseResults.experience;
-  this.projects = parseResults.projects;
-  this.parseHistory.push(parseResults);
+  this.text = parseResults.text; // Store raw text
+  this.skills = parseResults.skills || [];
+  this.experience = parseResults.experience || [];
+  this.projects = parseResults.projects || [];
+  this.warning = parseResults.warning; // Store any warnings
+  this.parseHistory.push({
+    skills: this.skills,
+    experience: this.experience,
+    projects: this.projects,
+    parsedAt: new Date(),
+  });
   this.currentVersion += 1;
   this.parseStatus = "completed";
   this.lastParseAttempt = new Date();

@@ -145,6 +145,83 @@ export const getProjectsFromText = async (text) => {
   }
 };
 
+// Direct AI parsing of resume text
+export const parseResumeWithAI = async (text) => {
+  if (!genAI)
+    return {
+      skills: getMockSkills(),
+      experience: getMockExperience(),
+      projects: getMockProjects(),
+    };
+
+  try {
+    const model = getModel();
+    const prompt = `
+      You are an expert resume parser. Parse this resume text and extract the following information accurately:
+
+      1.  **Technical Skills**: Identify and list all technical skills. This includes programming languages (e.g., Python, Java, JavaScript), frameworks (e.g., React, Angular, Node.js), databases (e.g., SQL, MongoDB), tools (e.g., Git, Docker, Jenkins), cloud platforms (e.g., AWS, Azure, GCP), operating systems, and other relevant technologies. Extract skills even if mentioned within descriptive sentences.
+      2.  **Work Experience**: Extract all work experiences. For each experience, include the job title/role, company name, employment dates (if available), and a summary of key responsibilities, achievements, or technologies used. If dates are not explicitly stated, note that. If a section is titled "Internships" or "Training", treat entries within as experiences.
+      3.  **Projects**: Extract all academic, personal, or professional projects. For each project, include the project name or a descriptive title, and a summary of its purpose, key features, or technologies used. If experience entries seem more like projects (e.g., "Developed a mobile app for X"), classify them as projects if they don't fit a formal work experience structure.
+
+      Important parsing rules:
+      -   Focus on extracting factual information for skills, experience, and projects.
+      -   For Skills: Extract individual skills/technologies. "Experience with Python and Django" should yield "Python" and "Django".
+      -   For Experience: Clearly separate distinct roles or internships.
+      -   For Projects: Clearly separate distinct projects.
+      -   Handle various resume formats, including those with unconventional section titles or less structured text.
+      -   Preserve technical terms exactly as written.
+      -   Remove any redundant or duplicate information within each category.
+      -   If a section is missing (e.g., no explicit "Projects" section), return an empty array for that field.
+
+      Resume text:
+      ${text}
+
+      Return ONLY a JSON object with this exact structure (no other text or explanations):
+      {
+        "skills": ["skill1", "skill2", ...],
+        "experience": ["description of experience 1 (e.g., Role at Company, Dates: Summary)", "description of experience 2", ...],
+        "projects": ["description of project 1 (e.g., Project Name: Summary)", "description of project 2", ...]
+      }
+    `;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const responseText = response.text();
+
+    try {
+      // Try to parse the JSON response
+      const cleanedResponse = responseText
+        .replace(/```json\n?|\n?```/g, "") // Remove markdown code blocks
+        .trim();
+
+      const parsed = JSON.parse(cleanedResponse);
+
+      return {
+        skills: Array.isArray(parsed.skills) ? parsed.skills : [],
+        experience: Array.isArray(parsed.experience) ? parsed.experience : [],
+        projects: Array.isArray(parsed.projects) ? parsed.projects : [],
+      };
+    } catch (parseError) {
+      console.error("Error parsing AI response:", parseError);
+      // Fallback to individual section parsing
+      const [skills, experience, projects] = await Promise.all([
+        getSkillsFromText(text),
+        getExperienceFromText(text),
+        getProjectsFromText(text),
+      ]);
+
+      return { skills, experience, projects };
+    }
+  } catch (error) {
+    console.error("Error using AI for resume parsing:", error);
+    return {
+      skills: getMockSkills(),
+      experience: getMockExperience(),
+      projects: getMockProjects(),
+    };
+  }
+};
+
 // Research company information
 export const researchCompany = async (companyName) => {
   if (!genAI) return getMockCompanyResearch(companyName);

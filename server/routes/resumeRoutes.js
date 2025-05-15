@@ -207,4 +207,59 @@ router.get("/user/:userId/has-resume", authenticateToken, async (req, res) => {
   }
 });
 
+// Update resume by ID
+router.patch("/:id", authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { skills, experience, projects } = req.body;
+
+    const resume = await Resume.findOne({
+      _id: id,
+      user: req.user.userId,
+    });
+
+    if (!resume) {
+      return res.status(404).json({ message: "Resume not found" });
+    }
+
+    // Update only the provided fields
+    if (skills !== undefined) resume.skills = skills;
+    if (experience !== undefined) resume.experience = experience;
+    if (projects !== undefined) resume.projects = projects;
+
+    // Clear any parsing warnings since user has manually edited
+    resume.warning = null;
+
+    // Add to parse history
+    resume.parseHistory.push({
+      skills: resume.skills,
+      experience: resume.experience,
+      projects: resume.projects,
+      parsedAt: new Date(),
+    });
+
+    // Ensure parseStatus is completed after manual edits
+    resume.parseStatus = "completed";
+
+    await resume.save();
+
+    // Generate fresh authenticated URL
+    const authenticatedUrl = generatePdfUrl(resume.cloudinaryPublicId);
+
+    // Return the complete resume object with URL
+    res.json({
+      id: resume._id,
+      ...resume.toObject(),
+      url: authenticatedUrl,
+      message: "Resume updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating resume:", error);
+    res.status(500).json({
+      message: "Error updating resume",
+      error: error.message,
+    });
+  }
+});
+
 export default router;

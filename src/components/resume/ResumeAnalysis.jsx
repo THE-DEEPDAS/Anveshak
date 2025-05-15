@@ -1,15 +1,114 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
+import { useToast } from "../../components/ui/Toaster";
 import {
   FaFileDownload,
   FaCode,
   FaBriefcase,
   FaSpinner,
   FaLightbulb,
+  FaEdit,
 } from "react-icons/fa";
 
 const ResumeAnalysis = () => {
-  const { resume } = useAppContext();
+  const { resume, updateResume } = useAppContext();
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+
+  const [isEditingSkills, setIsEditingSkills] = useState(false);
+  const [isEditingExperience, setIsEditingExperience] = useState(false);
+  const [isEditingProjects, setIsEditingProjects] = useState(false);
+  const [editableSkills, setEditableSkills] = useState([]);
+  const [editableExperience, setEditableExperience] = useState([]);
+  const [editableProjects, setEditableProjects] = useState([]);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Reset editable states when resume changes
+  useEffect(() => {
+    if (resume) {
+      setEditableSkills(resume.skills || []);
+      setEditableExperience(resume.experience || []);
+      setEditableProjects(resume.projects || []);
+    }
+  }, [resume]);
+
+  const handleSave = async (field, data, setEditingState) => {
+    if (isSaving) return; // Prevent multiple saves
+    setIsSaving(true);
+
+    try {
+      const validData = data.filter((item) => item.trim());
+      if (validData.length === 0) {
+        throw new Error(`Please add at least one ${field} item`);
+      }
+
+      const updatedData = {
+        ...resume,
+        [field]: validData,
+      };
+
+      await updateResume(updatedData);
+      setEditingState(false); // Hide edit mode after successful save
+    } catch (error) {
+      console.error(`Error saving ${field}:`, error);
+      showToast(error.message || `Failed to save ${field}`, "error");
+      // Don't hide edit mode on error so user can try again
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveSkills = () =>
+    handleSave("skills", editableSkills, setIsEditingSkills);
+  const handleSaveExperience = () =>
+    handleSave("experience", editableExperience, setIsEditingExperience);
+  const handleSaveProjects = () =>
+    handleSave("projects", editableProjects, setIsEditingProjects);
+
+  const handleEditToggle = (field) => {
+    switch (field) {
+      case "skills":
+        if (isEditingSkills) {
+          setEditableSkills(resume.skills || []);
+        }
+        setIsEditingSkills(!isEditingSkills);
+        break;
+      case "experience":
+        if (isEditingExperience) {
+          setEditableExperience(resume.experience || []);
+        }
+        setIsEditingExperience(!isEditingExperience);
+        break;
+      case "projects":
+        if (isEditingProjects) {
+          setEditableProjects(resume.projects || []);
+        }
+        setIsEditingProjects(!isEditingProjects);
+        break;
+    }
+  };
+
+  const hasValidContent = () => {
+    const hasValidSkills =
+      Array.isArray(resume?.skills) &&
+      resume.skills.some((skill) => skill.trim());
+    const hasValidExperience =
+      Array.isArray(resume?.experience) &&
+      resume.experience.some((exp) => exp.trim());
+    return (
+      (hasValidSkills || hasValidExperience) &&
+      resume?.parseStatus === "completed"
+    );
+  };
+
+  const canProceedToEmails = () => hasValidContent();
+
+  const handleEmailGeneration = () => {
+    if (canProceedToEmails()) {
+      navigate("/emails");
+    }
+  };
 
   if (!resume) {
     return (
@@ -21,134 +120,200 @@ const ResumeAnalysis = () => {
     );
   }
 
-  const pdfUrl = resume.url?.replace(/\s/g, "%20");
-
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6 max-w-4xl mx-auto">
-      <div className="border-b border-gray-200 pb-4 mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Resume Analysis</h2>
-        {pdfUrl && (
-          <div className="mt-4 flex items-center">
-            <a
-              href={pdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
-            >
-              <FaFileDownload className="mr-2" />
-              View Resume PDF
-            </a>
-            <p className="text-sm text-gray-500 ml-4">
-              Link expires after some time
-            </p>
-          </div>
-        )}
-      </div>
-
-      {resume.parseStatus === "pending" && (
+    <div className="p-4">
+      {resume.parseStatus === "pending" ? (
         <div className="flex items-center justify-center py-12 text-gray-600">
           <FaSpinner className="animate-spin mr-3 h-6 w-6" />
-          <span>Analyzing resume contents...</span>
+          <span>Analyzing resume contents... This may take a moment.</span>
         </div>
-      )}
-
-      {resume.parseStatus === "failed" && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg
-                className="h-5 w-5 text-red-400"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-red-700">
-                Failed to analyze resume: {resume.parseError?.message}
+      ) : (
+        <>
+          {resume?.text && (
+            <div className="mb-4 p-4 bg-gray-50 rounded">
+              <h3 className="font-semibold mb-2">Extracted Text</h3>
+              <p className="whitespace-pre-wrap text-sm text-gray-600">
+                {resume.text}
               </p>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {resume.parseStatus === "completed" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 shadow-sm">
-            <div className="flex items-center mb-4">
-              <FaCode className="text-blue-600 text-xl mr-2" />
-              <h3 className="text-xl font-semibold text-gray-800">
-                Technical Skills
-              </h3>
-            </div>
-            {resume.skills && resume.skills.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {resume.skills.map((skill, index) => (
-                  <span
-                    key={index}
-                    className="px-3 py-1 bg-white text-blue-700 rounded-full text-sm font-medium shadow-sm border border-blue-100"
-                  >
-                    {skill}
-                  </span>
-                ))}
+          <div className="space-y-6">
+            <div className="border rounded p-4">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="font-semibold">Skills</h3>
+                <button
+                  onClick={() => handleEditToggle("skills")}
+                  className="text-blue-600 hover:text-blue-800"
+                  disabled={isSaving}
+                >
+                  {isEditingSkills ? "Cancel" : "Edit"}
+                </button>
               </div>
-            ) : (
-              <p className="text-gray-500">No skills detected</p>
-            )}
-          </div>
+              {isEditingSkills ? (
+                <div className="space-y-2">
+                  {editableSkills.map((skill, index) => (
+                    <input
+                      key={index}
+                      type="text"
+                      value={skill}
+                      onChange={(e) => {
+                        const newSkills = [...editableSkills];
+                        newSkills[index] = e.target.value;
+                        setEditableSkills(newSkills);
+                      }}
+                      className="border p-2 w-full rounded"
+                    />
+                  ))}
+                  <button
+                    onClick={() => setEditableSkills([...editableSkills, ""])}
+                    className="text-green-600 hover:text-green-800"
+                    disabled={isSaving}
+                  >
+                    + Add Skill
+                  </button>
+                  <button
+                    onClick={handleSaveSkills}
+                    className="ml-2 bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                    disabled={isSaving}
+                  >
+                    {isSaving ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              ) : (
+                <ul className="list-disc list-inside">
+                  {resume?.skills?.map((skill, index) => (
+                    <li key={index}>{skill}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 shadow-sm">
-            <div className="flex items-center mb-4">
-              <FaBriefcase className="text-purple-600 text-xl mr-2" />
-              <h3 className="text-xl font-semibold text-gray-800">
-                Experience
-              </h3>
-            </div>
-            {resume.experience && resume.experience.length > 0 ? (
-              <div className="space-y-3">
-                {resume.experience.map((exp, index) => (
-                  <div
-                    key={index}
-                    className="bg-white p-3 rounded-lg shadow-sm border border-purple-100"
-                  >
-                    <p className="text-gray-700">{exp}</p>
-                  </div>
-                ))}
+            <div className="border rounded p-4">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="font-semibold">Experience</h3>
+                <button
+                  onClick={() => handleEditToggle("experience")}
+                  className="text-blue-600 hover:text-blue-800"
+                  disabled={isSaving}
+                >
+                  {isEditingExperience ? "Cancel" : "Edit"}
+                </button>
               </div>
-            ) : (
-              <p className="text-gray-500">No experience detected</p>
-            )}
-          </div>
+              {isEditingExperience ? (
+                <div className="space-y-2">
+                  {editableExperience.map((exp, index) => (
+                    <textarea
+                      key={index}
+                      value={exp}
+                      onChange={(e) => {
+                        const newExp = [...editableExperience];
+                        newExp[index] = e.target.value;
+                        setEditableExperience(newExp);
+                      }}
+                      className="border p-2 w-full rounded"
+                      rows="3"
+                    />
+                  ))}
+                  <button
+                    onClick={() =>
+                      setEditableExperience([...editableExperience, ""])
+                    }
+                    className="text-green-600 hover:text-green-800"
+                    disabled={isSaving}
+                  >
+                    + Add Experience
+                  </button>
+                  <button
+                    onClick={handleSaveExperience}
+                    className="ml-2 bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                    disabled={isSaving}
+                  >
+                    {isSaving ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              ) : (
+                <ul className="list-disc list-inside">
+                  {resume?.experience?.map((exp, index) => (
+                    <li key={index}>{exp}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
-          <div className="md:col-span-2 bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 shadow-sm">
-            <div className="flex items-center mb-4">
-              <FaLightbulb className="text-green-600 text-xl mr-2" />
-              <h3 className="text-xl font-semibold text-gray-800">Projects</h3>
-            </div>
-            {resume.projects && resume.projects.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {resume.projects.map((project, index) => (
-                  <div
-                    key={index}
-                    className="bg-white p-4 rounded-lg shadow-sm border border-green-100 hover:shadow-md transition-shadow"
-                  >
-                    <h4 className="font-medium text-gray-900 mb-2">
-                      Project {index + 1}
-                    </h4>
-                    <p className="text-gray-700 text-sm">{project}</p>
-                  </div>
-                ))}
+            <div className="border rounded p-4">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="font-semibold">Projects (Optional)</h3>
+                <button
+                  onClick={() => handleEditToggle("projects")}
+                  className="text-blue-600 hover:text-blue-800"
+                  disabled={isSaving}
+                >
+                  {isEditingProjects ? "Cancel" : "Edit"}
+                </button>
               </div>
-            ) : (
-              <p className="text-gray-500">No projects detected</p>
-            )}
+              {isEditingProjects ? (
+                <div className="space-y-2">
+                  {editableProjects.map((proj, index) => (
+                    <textarea
+                      key={index}
+                      value={proj}
+                      onChange={(e) => {
+                        const newProj = [...editableProjects];
+                        newProj[index] = e.target.value;
+                        setEditableProjects(newProj);
+                      }}
+                      className="border p-2 w-full rounded"
+                      rows="3"
+                    />
+                  ))}
+                  <button
+                    onClick={() =>
+                      setEditableProjects([...editableProjects, ""])
+                    }
+                    className="text-green-600 hover:text-green-800"
+                    disabled={isSaving}
+                  >
+                    + Add Project
+                  </button>
+                  <button
+                    onClick={handleSaveProjects}
+                    className="ml-2 bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                    disabled={isSaving}
+                  >
+                    {isSaving ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              ) : (
+                <ul className="list-disc list-inside">
+                  {resume?.projects?.map((proj, index) => (
+                    <li key={index}>{proj}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="mt-4">
+              {canProceedToEmails() ? (
+                <button
+                  onClick={handleEmailGeneration}
+                  className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+                >
+                  Continue to Email Generation
+                </button>
+              ) : (
+                <p className="text-amber-600">
+                  {resume?.skills?.length === 0 &&
+                  resume?.experience?.length === 0
+                    ? "Please add some skills or experience to continue with email generation."
+                    : resume?.parseStatus !== "completed"
+                    ? "Waiting for resume parsing to complete..."
+                    : "Please ensure you have added either skills or experience to continue."}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

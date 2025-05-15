@@ -43,6 +43,34 @@ export const getResumeById = async (resumeId) => {
   }
 };
 
+export const updateResume = async (resumeData) => {
+  try {
+    if (!resumeData.id) {
+      throw new Error("Resume ID is required");
+    }
+
+    const response = await axios.patch(
+      `${API_ENDPOINTS.resumes}/${resumeData.id}`,
+      {
+        skills: resumeData.skills || [],
+        experience: resumeData.experience || [],
+        projects: resumeData.projects || [],
+      }
+    );
+
+    if (!response.data) {
+      throw new Error("No response from server");
+    }
+
+    return response.data;
+  } catch (error) {
+    console.error("Error updating resume:", error);
+    throw (
+      error.response?.data?.message || error.message || "Error updating resume"
+    );
+  }
+};
+
 // Mock function for development
 export const getMockResumeData = () => {
   return {

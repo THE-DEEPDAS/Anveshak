@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { getCurrentUser } from "../services/authService";
 import { useNavigate } from "react-router-dom";
+import { updateResume as updateResumeService } from "../services/resumeService";
+import { useToast } from "../components/ui/Toaster";
 
 const AppContext = createContext();
 
@@ -26,6 +28,7 @@ export const AppProvider = ({ children }) => {
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -37,7 +40,9 @@ export const AppProvider = ({ children }) => {
       } catch (error) {
         console.error("Error initializing auth:", error);
         if (
-          !PUBLIC_ROUTES.some((route) => location.pathname.startsWith(route))
+          !location.pathname.startsWith("/login") &&
+          !location.pathname.startsWith("/signup") &&
+          !location.pathname.startsWith("/verify")
         ) {
           window.location.href = "/login";
         }
@@ -58,11 +63,42 @@ export const AppProvider = ({ children }) => {
     }
   }, [resume]);
 
-  const contextValue = {
+  const updateResume = async (updatedResume) => {
+    try {
+      const response = await updateResumeService(updatedResume);
+
+      if (!response || !response.id) {
+        throw new Error("Invalid response from server");
+      }
+
+      setResume({
+        id: response.id,
+        url: response.url,
+        skills: response.skills || [],
+        experience: response.experience || [],
+        projects: response.projects || [],
+        parseStatus: response.parseStatus || "completed",
+      });
+
+      showToast(response.message || "Resume updated successfully", "success");
+      return response;
+    } catch (error) {
+      console.error("Error saving resume updates:", error);
+      const errorMessage =
+        typeof error === "string"
+          ? error
+          : error.message || "Failed to save changes";
+      showToast(errorMessage, "error");
+      throw error;
+    }
+  };
+
+  const value = {
     user,
     setUser,
     resume,
     setResume,
+    updateResume,
     emails,
     setEmails,
     loading,
@@ -76,7 +112,5 @@ export const AppProvider = ({ children }) => {
     );
   }
 
-  return (
-    <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>
-  );
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
