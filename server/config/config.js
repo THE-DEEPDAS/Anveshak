@@ -91,7 +91,7 @@ export const config = {
     pass: process.env.EMAIL_PASS,
   },
   mongodb: {
-    uri: process.env.MONGODB_URI || "mongodb://localhost:27017/coldmailer",
+    uri: process.env.MONGODB_URI,
   },
   server: {
     port: parseInt(process.env.PORT, 10) || 5000,
