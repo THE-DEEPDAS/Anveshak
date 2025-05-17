@@ -1,8 +1,11 @@
 import axios from "axios";
 import { API_ENDPOINTS } from "../config/api";
 
-export const uploadResume = async (formData) => {
+export const uploadResume = async (formData, parseMode = "auto") => {
   try {
+    // Add parseMode to formData
+    formData.append("parseMode", parseMode);
+
     const response = await axios.post(
       `${API_ENDPOINTS.resumes}/upload`,
       formData,

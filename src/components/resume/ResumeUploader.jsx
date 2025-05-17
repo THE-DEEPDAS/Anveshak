@@ -14,6 +14,9 @@ import {
   FaRobot,
   FaExclamationTriangle,
   FaTrash,
+  FaCodeBranch,
+  FaBrain,
+  FaCog,
 } from "react-icons/fa";
 import { useToast } from "../../components/ui/Toaster";
 
@@ -24,8 +27,36 @@ const ResumeUploader = () => {
   const [isRetrying, setIsRetrying] = useState(false);
   const [error, setError] = useState(null);
   const [parseWarning, setParseWarning] = useState(null);
+  const [parseMode, setParseMode] = useState("auto");
+  const [showParseModeOptions, setShowParseModeOptions] = useState(false);
   const navigate = useNavigate();
   const { showToast } = useToast();
+
+  // Parse mode options
+  const parseModeOptions = [
+    {
+      value: "auto",
+      label: "Auto (Default)",
+      description: "Try simplified parser first, fall back to AI if needed",
+    },
+    {
+      value: "simplified",
+      label: "Simplified",
+      description:
+        "Use only the simplified parser (faster, less resource intensive)",
+    },
+    {
+      value: "ai",
+      label: "AI Parser",
+      description:
+        "Use AI to extract resume data (more accurate for complex resumes)",
+    },
+    {
+      value: "retry",
+      label: "Alternative Parser",
+      description: "Try alternative parsing method",
+    },
+  ];
 
   useEffect(() => {
     if (resume?.id && resume.parseStatus === "pending") {
@@ -128,31 +159,32 @@ const ResumeUploader = () => {
     }
   };
 
-  const handleUpload = async (file) => {
-    if (!file) return;
+  // Toggle parse mode options display
+  const toggleParseModeOptions = () => {
+    setShowParseModeOptions(!showParseModeOptions);
+  };
 
-    // Validate file type and size
-    if (file.type !== "application/pdf") {
-      showToast("Only PDF files are allowed", "error");
+  // Handle parse mode selection
+  const handleParseModeChange = (mode) => {
+    setParseMode(mode);
+    setShowParseModeOptions(false);
+    showToast(`Parse mode set to: ${mode}`, "info");
+  };
+
+  const handleFileUpload = async (file) => {
+    if (!file) {
+      setError("Please select a file to upload");
       return;
     }
-
-    if (file.size > 5 * 1024 * 1024) {
-      showToast("File size must be less than 5MB", "error");
-      return;
-    }
-
     const formData = new FormData();
-    formData.append("resume", file);
-    formData.append("name", user.name);
-    formData.append("email", user.email);
+    formData.append("resume", file); // Changed from "file" to "resume" to match server's expectation
 
     setIsUploading(true);
     setError(null);
     setParseWarning(null);
 
     try {
-      const response = await uploadResume(formData);
+      const response = await uploadResume(formData, parseMode);
 
       setResume({
         id: response.resumeId,
@@ -163,6 +195,7 @@ const ResumeUploader = () => {
         projects: response.resume.projects || [],
         warning: response.resume.warning || null,
         parseMethod: response.resume.parseMethod,
+        foundExactSections: response.resume.foundExactSections,
       });
 
       if (response.resume.parseStatus === "failed") {
@@ -194,6 +227,7 @@ const ResumeUploader = () => {
       setIsUploading(false);
     }
   };
+
   if (resume?.url) {
     return (
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -216,6 +250,38 @@ const ResumeUploader = () => {
             >
               View Current Resume
             </a>
+
+            {/* Parser method indicator */}
+            {resume.parseMethod && (
+              <div className="flex items-center">
+                <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-md flex items-center">
+                  {resume.parseMethod === "ai" ||
+                  resume.parseMethod === "ai-fallback" ? (
+                    <>
+                      <FaRobot className="mr-1 text-blue-500" size={12} />
+                      AI Parsed
+                    </>
+                  ) : resume.parseMethod?.includes("simplified") ? (
+                    <>
+                      <FaCodeBranch className="mr-1 text-green-500" size={12} />
+                      Standard Parser
+                    </>
+                  ) : (
+                    <>
+                      <FaCog className="mr-1 text-gray-500" size={12} />
+                      {resume.parseMethod}
+                    </>
+                  )}
+
+                  {resume.foundExactSections && (
+                    <span
+                      className="ml-1 inline-block w-2 h-2 bg-green-500 rounded-full"
+                      title="Found exact section headers"
+                    ></span>
+                  )}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Parse status information */}
@@ -274,6 +340,7 @@ const ResumeUploader = () => {
                         disabled={isRetrying}
                         className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-bold rounded-md text-black bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                       >
+                        {" "}
                         <FaSync
                           className={`mr-1 h-3 w-3 ${
                             isRetrying ? "animate-spin" : ""
@@ -336,8 +403,73 @@ const ResumeUploader = () => {
             <h3 className="text-lg font-medium text-gray-800 mb-2">
               Upload New Resume
             </h3>
+
+            {/* Parse Mode Selection (when resume exists) */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Parse Mode
+                </label>
+                <button
+                  type="button"
+                  onClick={toggleParseModeOptions}
+                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                >
+                  <FaCog className="mr-1" />
+                  {showParseModeOptions ? "Hide Options" : "Show Options"}
+                </button>
+              </div>
+
+              {showParseModeOptions ? (
+                <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
+                  <div className="grid gap-3">
+                    {parseModeOptions.map((option) => (
+                      <div
+                        key={option.value}
+                        className={`flex items-start p-2 rounded-md cursor-pointer border ${
+                          parseMode === option.value
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-transparent hover:bg-gray-100"
+                        }`}
+                        onClick={() => handleParseModeChange(option.value)}
+                      >
+                        <div className="flex items-center h-5">
+                          <input
+                            type="radio"
+                            name="parseMode"
+                            checked={parseMode === option.value}
+                            onChange={() => handleParseModeChange(option.value)}
+                            className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div className="ml-3">
+                          <label className="font-medium text-gray-800 text-sm">
+                            {option.label}
+                          </label>
+                          <p className="text-gray-500 text-xs">
+                            {option.description}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center">
+                  <span className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                    Selected:{" "}
+                    {
+                      parseModeOptions.find(
+                        (option) => option.value === parseMode
+                      )?.label
+                    }
+                  </span>
+                </div>
+              )}
+            </div>
+
             <FileUpload
-              onFileSelect={handleUpload}
+              onFileSelect={handleFileUpload}
               accept=".pdf"
               maxSize={5}
               label="Upload a new resume to replace the current one (PDF only, max 5MB)"
@@ -348,14 +480,78 @@ const ResumeUploader = () => {
       </div>
     );
   }
+  // Resume uploader UI when no resume exists
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
       <h2 className="text-xl font-semibold text-gray-800 mb-4">
         Upload Resume
       </h2>
       <div className="space-y-4">
+        {/* Parse Mode Selection */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Parse Mode
+            </label>
+            <button
+              type="button"
+              onClick={toggleParseModeOptions}
+              className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+            >
+              <FaCog className="mr-1" />
+              {showParseModeOptions ? "Hide Options" : "Show Options"}
+            </button>
+          </div>
+
+          {showParseModeOptions ? (
+            <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
+              <div className="grid gap-3">
+                {parseModeOptions.map((option) => (
+                  <div
+                    key={option.value}
+                    className={`flex items-start p-2 rounded-md cursor-pointer border ${
+                      parseMode === option.value
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-transparent hover:bg-gray-100"
+                    }`}
+                    onClick={() => handleParseModeChange(option.value)}
+                  >
+                    <div className="flex items-center h-5">
+                      <input
+                        type="radio"
+                        name="parseMode"
+                        checked={parseMode === option.value}
+                        onChange={() => handleParseModeChange(option.value)}
+                        className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="ml-3">
+                      <label className="font-medium text-gray-800 text-sm">
+                        {option.label}
+                      </label>
+                      <p className="text-gray-500 text-xs">
+                        {option.description}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center">
+              <span className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                Selected:{" "}
+                {
+                  parseModeOptions.find((option) => option.value === parseMode)
+                    ?.label
+                }
+              </span>
+            </div>
+          )}
+        </div>
+
         <FileUpload
-          onFileSelect={handleUpload}
+          onFileSelect={handleFileUpload}
           accept=".pdf"
           maxSize={5}
           label="Upload your resume (PDF only, max 5MB)"

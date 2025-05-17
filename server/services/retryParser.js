@@ -3,7 +3,7 @@
  * This service helps with retrying failed resume parsing attempts
  */
 import Resume from "../models/Resume.js";
-import { parseResumeText } from "./resumeParser.js";
+import { parseResume } from "./resumeParser.js";
 import { parseResumeWithAI } from "./aiService.js";
 
 /**
@@ -69,12 +69,11 @@ export const retryParseResume = async (resumeId, forceAI = false) => {
       console.log(
         "Attempting full re-parse from PDF using simplified parser by default"
       );
-
       try {
-        parsedData = await parseResumeText(
-          resume.cloudinaryPublicId,
-          previousVersionData
-        );
+        parsedData = await parseResume(resume.cloudinaryPublicId, {
+          parseMode: forceAI ? "ai" : "auto",
+          previousVersionData,
+        });
       } catch (parseError) {
         console.error("Retry parsing error:", parseError);
 

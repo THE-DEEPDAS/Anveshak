@@ -80,7 +80,6 @@ export async function parseResumeText(pdfBuffer) {
             }
 
             // Return the text content directly with improved processing
-            // Using the OpenResume algorithm for better text extraction
             return pageData
               .getTextContent({
                 normalizeWhitespace: true,
@@ -88,7 +87,6 @@ export async function parseResumeText(pdfBuffer) {
               })
               .then(function (textContent) {
                 // Process text content items into proper strings with positioning
-                // Implementation based on the algorithm described in the OpenResume parser
                 let lastY,
                   text = "";
                 let lineItems = [];
@@ -242,12 +240,13 @@ export async function parseResumeText(pdfBuffer) {
     }
 
     // Process the text to extract sections
-    const sections = extractSectionsFromText(rawText);
+    const { sections, foundExactSections } = extractSectionsFromText(rawText);
     console.log(
       `Found ${Object.keys(sections).length} sections: ${Object.keys(
         sections
       ).join(", ")}`
     );
+    console.log(`Found exact section matches: ${foundExactSections}`);
 
     // Extract skills, experience, and projects
     const skills = extractSkills(sections);
@@ -263,6 +262,7 @@ export async function parseResumeText(pdfBuffer) {
       experience,
       projects,
       rawText,
+      foundExactSections,
     };
   } catch (error) {
     console.error("Error parsing resume:", error);
@@ -358,10 +358,12 @@ function extractSectionsFromText(text) {
     lines.slice(0, 5).forEach((line) => console.log(`> ${line}`));
   }
 
+  // Track if we found exact section matches
+  let foundExactSectionMatches = false;
   let currentSection = null;
   const sectionContent = {};
 
-  // First pass: identify sections by exact headers
+  // First pass: identify sections by exact headers only
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const lineUpper = line.toUpperCase();
@@ -372,13 +374,11 @@ function extractSectionsFromText(text) {
       if (
         lineUpper === header ||
         lineUpper.startsWith(header + ":") ||
-        lineUpper.startsWith(header + " ") ||
-        lineUpper.includes(" " + header) ||
-        lineUpper.includes(" " + header + " ") ||
-        lineUpper.includes(" " + header + ":")
+        lineUpper.startsWith(header + " ")
       ) {
         matchedHeader = header;
-        console.log(`Found section header: ${line} (matched: ${header})`);
+        foundExactSectionMatches = true;
+        console.log(`Found exact section header: ${line} (matched: ${header})`);
         break;
       }
     }
@@ -409,8 +409,8 @@ function extractSectionsFromText(text) {
     }
   }
 
-  // If no sections were found with exact matches, try looser matching with more aggressive detection
-  if (Object.keys(sectionContent).length === 0) {
+  // Only proceed to looser matching if we didn't find exact matches
+  if (!foundExactSectionMatches) {
     console.log("No exact section headers found, trying looser matching...");
 
     // First identify potential section headers by formatting cues
@@ -457,6 +457,7 @@ function extractSectionsFromText(text) {
 
     // If potential headers were found, process them
     if (potentialHeaders.length > 0) {
+      foundExactSectionMatches = true; // Consider these as valid sections
       for (let i = 0; i < potentialHeaders.length; i++) {
         const header = potentialHeaders[i];
         const nextHeaderIndex =
@@ -476,8 +477,10 @@ function extractSectionsFromText(text) {
   }
 
   // If still no sections, use keyword-based content assignment approach
-  if (Object.keys(sectionContent).length === 0) {
-    console.log("Still no sections found, trying content-based assignment...");
+  if (!foundExactSectionMatches) {
+    console.log(
+      "No sections found, trying content-based assignment on full text..."
+    );
 
     // Check for skill indicators (languages, technologies, etc.)
     const skillLines = [];
@@ -586,12 +589,12 @@ function extractSectionsFromText(text) {
       }
 
       // In case the resume text is extremely minimal or no lines were found
-      if (lines.length < 5 && rawText.length > 0) {
+      if (lines.length < 5 && text.length > 0) {
         console.log(
           "Minimal text detected, attempting to process raw text directly"
         ); // Attempt to extract words that might be skills
         const potentialSkillWords =
-          rawText.match(/\b[A-Za-z][A-Za-z+#.]{2,}\b/g) || [];
+          text.match(/\b[A-Za-z][A-Za-z+#.]{2,}\b/g) || [];
 
         // Define common tech skills here to avoid reference error
         const commonSkills = [
@@ -635,28 +638,33 @@ function extractSectionsFromText(text) {
   }
 
   // Handle special case for skills sections that might be labeled as categories
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (
-      line.includes("Programming Languages:") ||
-      line.includes("Artificial Intelligence:") ||
-      line.includes("Web Development:") ||
-      line.includes("Databases & Tools:") ||
-      line.includes("Other Skills:") ||
-      line.includes("Technical Skills:") ||
-      line.includes("Frameworks:") ||
-      line.includes("Technologies:") ||
-      line.match(/\w+:\s*([\w\s,]+)/) // Any word followed by colon and list
-    ) {
-      if (!sectionContent["SKILLS"]) {
-        sectionContent["SKILLS"] = [];
-        console.log(`Found skill category header: ${line}`);
+  if (!sectionContent["SKILLS"] || sectionContent["SKILLS"].length === 0) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (
+        line.includes("Programming Languages:") ||
+        line.includes("Artificial Intelligence:") ||
+        line.includes("Web Development:") ||
+        line.includes("Databases & Tools:") ||
+        line.includes("Other Skills:") ||
+        line.includes("Technical Skills:") ||
+        line.includes("Frameworks:") ||
+        line.includes("Technologies:") ||
+        line.match(/\w+:\s*([\w\s,]+)/) // Any word followed by colon and list
+      ) {
+        if (!sectionContent["SKILLS"]) {
+          sectionContent["SKILLS"] = [];
+          console.log(`Found skill category header: ${line}`);
+        }
+        sectionContent["SKILLS"].push(line);
       }
-      sectionContent["SKILLS"].push(line);
     }
   }
 
-  return sectionContent;
+  return {
+    sections: sectionContent,
+    foundExactSections: foundExactSectionMatches,
+  };
 }
 
 /**

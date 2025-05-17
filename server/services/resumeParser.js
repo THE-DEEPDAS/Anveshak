@@ -1013,39 +1013,78 @@ const extractProjects = (text) => {
   return cleanedProjects;
 };
 
-export const parseResumeText = async (publicId, previousVersion = null) => {
-  let dataBuffer = null;
-  let tempFilePath = null;
+// Process the resume and extract text and skills
+export const parseResume = async (path, options = {}) => {
+  console.log(`⏳ Parsing resume from path: ${path}`);
+  // Check if the path is a URL, local file path, or a Cloudinary public ID
+  const isCloudinaryUrl =
+    path.startsWith("http") ||
+    path.includes("cloudinary") ||
+    path.startsWith("resumes/") || // Handles Cloudinary folder structure
+    path.includes("/"); // Handles any path with forward slashes (likely a Cloudinary path)// Handles direct public IDs
+
   try {
-    console.log("Starting resume parsing for publicId:", publicId);
+    let dataBuffer = null;
+    let tempFilePath = null;
+    if (isCloudinaryUrl) {
+      console.log("Cloudinary URL or public ID detected, downloading PDF...");
 
-    // Get PDF from Cloudinary
-    const result = await cloudinary.api.resource(publicId, {
-      resource_type: "raw",
-    });
-
-    // Download PDF with improved error handling
-    console.log("Downloading PDF from Cloudinary...");
-    let response;
-    try {
-      response = await axios.get(result.secure_url, {
-        responseType: "arraybuffer",
-        timeout: 30000, // 30 second timeout
-        maxContentLength: 15 * 1024 * 1024, // 15MB limit
-        headers: {
-          Accept: "application/pdf",
-        },
-      });
-    } catch (downloadError) {
-      console.error("Error downloading PDF:", downloadError.message);
-
-      // Try an alternative download method
-      console.log("Retrying with getFileFromCloudinary...");
-      const altData = await getFileFromCloudinary(publicId);
-      if (altData) {
-        dataBuffer = Buffer.from(altData);
+      // Handle different path formats
+      let publicId;
+      if (path.includes("/upload/")) {
+        // It's a full Cloudinary URL
+        publicId = path.split("/upload/")[1];
+      } else if (path.startsWith("resumes/") || path.includes("/")) {
+        // It's already a public ID (e.g., "resumes/userid/filename.pdf")
+        publicId = path;
       } else {
-        throw new Error("Failed to download PDF after retries");
+        throw new Error("Invalid Cloudinary identifier format");
+      }
+
+      console.log(`Using Cloudinary public ID: ${publicId}`);
+
+      // Download the file from Cloudinary
+      try {
+        dataBuffer = await getFileFromCloudinary(publicId);
+        console.log(
+          `Downloaded PDF from Cloudinary, size: ${dataBuffer.length} bytes`
+        );
+      } catch (cloudinaryError) {
+        console.error("Error downloading from Cloudinary:", cloudinaryError);
+        throw new Error("Failed to download PDF from Cloudinary");
+      }
+    } else {
+      console.log("Local file path detected, reading file...");
+
+      // Check if the path contains forward slashes but wasn't caught by isCloudinaryUrl
+      if (path.includes("/") && !path.includes(":\\")) {
+        console.log(
+          "Path appears to be a Cloudinary ID but wasn't recognized earlier. Attempting to treat as Cloudinary ID..."
+        );
+        try {
+          dataBuffer = await getFileFromCloudinary(path);
+          console.log(
+            `Downloaded PDF from Cloudinary, size: ${dataBuffer.length} bytes`
+          );
+        } catch (cloudinaryError) {
+          console.error(
+            "Failed treating as Cloudinary ID, falling back to local file read:",
+            cloudinaryError
+          );
+          // Continue to try as local file
+        }
+      }
+
+      // If we still don't have data, try as local file
+      if (!dataBuffer) {
+        // For local files, read the file into memory
+        try {
+          dataBuffer = await fs.readFile(path);
+          console.log(`Read local PDF file, size: ${dataBuffer.length} bytes`);
+        } catch (readError) {
+          console.error("Error reading local file:", readError);
+          throw new Error("Failed to read local PDF file");
+        }
       }
     }
 
@@ -1055,8 +1094,11 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
     if (!dataBuffer) {
       throw new Error("Failed to obtain PDF data");
     }
-    console.log("PDF downloaded successfully, parsing text...");
-    console.log("Using simplified parsing as default method...");
+    console.log("PDF loaded successfully, parsing text...");
+
+    // Parse options
+    const parseMode = options.parseMode || "auto"; // 'auto', 'simplified', 'ai', 'retry'
+    console.log(`Using parse mode: ${parseMode}`);
 
     // Clean up temporary file if it exists before parsing
     if (tempFilePath) {
@@ -1067,6 +1109,7 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
         console.error("Error cleaning up temporary PDF file:", cleanupError);
       }
     }
+
     try {
       // Log buffer info for debugging
       console.log(
@@ -1086,15 +1129,22 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
         } experiences, ${formattedData.projects?.length || 0} projects`
       );
 
+      // Check if we found exact section matches
+      const { foundExactSections } = parsedData;
+      console.log(`Found exact section matches: ${foundExactSections}`);
+
       // Check if we have meaningful content from the simplified parser
       const hasMinimalContent =
         formattedData.skills.length > 0 ||
         formattedData.experience.length > 0 ||
         formattedData.projects.length > 0;
 
-      // If we have content, return it
-      if (hasMinimalContent) {
-        console.log("Simplified parser returned usable content, using results");
+      // If user specified a specific parseMode, honor that request
+      if (
+        parseMode === "simplified" ||
+        (parseMode === "auto" && (hasMinimalContent || foundExactSections))
+      ) {
+        console.log("Using simplified parser results");
         return {
           text: parsedData.rawText || "",
           skills: formattedData.skills || [],
@@ -1102,64 +1152,23 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
           projects: formattedData.projects || [],
           parsedAt: new Date(),
           parseMethod: "simplified",
+          foundExactSections: foundExactSections,
         };
-      }
+      } else if (
+        parseMode === "ai" ||
+        (parseMode === "auto" && !foundExactSections && !hasMinimalContent)
+      ) {
+        // Use AI parser if:
+        // 1. User explicitly requested AI parsing
+        // 2. In auto mode, simplified parser didn't find exact sections or any content
+        console.log("Attempting AI parsing");
+        const rawText = parsedData.rawText || "";
 
-      // If simplified parser didn't find content, try AI parser
-      console.log(
-        "Simplified parser found no content, falling back to AI parser"
-      );
-      const rawText = parsedData.rawText || "";
-      if (rawText.length > 50) {
-        try {
-          console.log("Attempting AI parsing");
-          const aiResult = await parseResumeWithAI(rawText);
-
-          console.log("AI parsing complete");
-          console.log(
-            `AI found: ${aiResult.skills?.length || 0} skills, ${
-              aiResult.experience?.length || 0
-            } experiences, ${aiResult.projects?.length || 0} projects`
-          );
-
-          return {
-            text: rawText,
-            skills: aiResult.skills || [],
-            experience: aiResult.experience || [],
-            projects: aiResult.projects || [],
-            parsedAt: new Date(),
-            parseMethod: "ai",
-          };
-        } catch (aiError) {
-          console.error("Error in AI parsing:", aiError);
-          console.log("AI parser failed, returning simplified results");
-        }
-      }
-
-      // If AI parsing failed or couldn't be attempted, return simplified results
-      return {
-        text: parsedData.rawText || "",
-        skills: formattedData.skills || [],
-        experience: formattedData.experience || [],
-        projects: formattedData.projects || [],
-        parsedAt: new Date(),
-        parseMethod: "simplified",
-      };
-    } catch (simplifiedError) {
-      console.error("Error in simplified parsing:", simplifiedError);
-      console.log("Simplified parser failed, attempting AI parser");
-
-      // Try to convert buffer to string to use with AI parser
-      try {
-        const rawText = dataBuffer.toString("utf8");
-        if (rawText && rawText.length > 50) {
+        if (rawText.length > 50) {
           try {
-            console.log(
-              "Attempting AI parsing after simplified parser failure"
-            );
             const aiResult = await parseResumeWithAI(rawText);
 
-            console.log("AI parsing complete after simplified parser failure");
+            console.log("AI parsing complete");
             console.log(
               `AI found: ${aiResult.skills?.length || 0} skills, ${
                 aiResult.experience?.length || 0
@@ -1172,65 +1181,115 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
               experience: aiResult.experience || [],
               projects: aiResult.projects || [],
               parsedAt: new Date(),
-              parseMethod: "ai-fallback",
+              parseMethod: "ai",
+              foundExactSections: false,
             };
           } catch (aiError) {
-            console.error("AI parser also failed:", aiError);
+            console.error("Error in AI parsing:", aiError);
+            console.log(
+              "AI parser failed, returning simplified results as fallback"
+            );
+
+            // Return simplified results as fallback
+            return {
+              text: parsedData.rawText || "",
+              skills: formattedData.skills || [],
+              experience: formattedData.experience || [],
+              projects: formattedData.projects || [],
+              parsedAt: new Date(),
+              parseMethod: "simplified-fallback",
+              foundExactSections: foundExactSections,
+            };
           }
+        } else {
+          console.log(
+            "Text too short for AI parsing, returning simplified results"
+          );
+          // Return simplified results if text is too short
+          return {
+            text: parsedData.rawText || "",
+            skills: formattedData.skills || [],
+            experience: formattedData.experience || [],
+            projects: formattedData.projects || [],
+            parsedAt: new Date(),
+            parseMethod: "simplified-fallback",
+            foundExactSections: foundExactSections,
+          };
         }
-      } catch (textConversionError) {
-        console.error(
-          "Failed to convert buffer to text for AI parsing:",
-          textConversionError
-        );
+      } else if (parseMode === "retry") {
+        // Retry with advanced parser (for future implementation)
+        console.log("Retry parsing requested, using alternative method");
+        // Placeholder for retry logic
+        // For now, return simplified results
+        return {
+          text: parsedData.rawText || "",
+          skills: formattedData.skills || [],
+          experience: formattedData.experience || [],
+          projects: formattedData.projects || [],
+          parsedAt: new Date(),
+          parseMethod: "simplified-retry",
+          foundExactSections: foundExactSections,
+        };
       }
 
-      // If all attempts failed, return empty results
+      // Default fallback
+      return {
+        text: parsedData.rawText || "",
+        skills: formattedData.skills || [],
+        experience: formattedData.experience || [],
+        projects: formattedData.projects || [],
+        parsedAt: new Date(),
+        parseMethod: "simplified-default",
+        foundExactSections: foundExactSections,
+      };
+    } catch (simplifiedError) {
+      console.error("Error in simplified parsing:", simplifiedError);
+      console.log("Simplified parser failed, attempting AI parser as fallback");
+
+      try {
+        // Try to extract at least some text from the PDF for AI parsing
+        const fallbackData = await pdfParse(dataBuffer, {
+          max: 15 * 1024 * 1024,
+        });
+
+        if (
+          fallbackData &&
+          fallbackData.text &&
+          fallbackData.text.length > 50
+        ) {
+          try {
+            const aiResult = await parseResumeWithAI(fallbackData.text);
+
+            return {
+              text: fallbackData.text,
+              skills: aiResult.skills || [],
+              experience: aiResult.experience || [],
+              projects: aiResult.projects || [],
+              parsedAt: new Date(),
+              parseMethod: "ai-fallback",
+              foundExactSections: false,
+            };
+          } catch (aiError) {
+            console.error("AI fallback parsing failed:", aiError);
+          }
+        }
+      } catch (fallbackError) {
+        console.error("Fallback extraction failed:", fallbackError);
+      }
+
+      // If all parsing attempts failed, return empty results
       return {
         text: "",
         skills: [],
         experience: [],
         projects: [],
         parsedAt: new Date(),
-        parseMethod: "simplified_failed",
-        warning:
-          "Simplified parsing failed. Please review and update the extracted data as needed.",
+        parseMethod: "failed",
+        foundExactSections: false,
       };
     }
   } catch (error) {
-    console.error("Resume parsing error:", error);
-
-    // Clean up temporary file if it exists
-    if (tempFilePath) {
-      try {
-        await fs.unlink(tempFilePath);
-        console.log("Temporary PDF file cleaned up");
-      } catch (cleanupError) {
-        console.error("Error cleaning up temporary PDF file:", cleanupError);
-      }
-    }
-
-    // If we have a previous version, use that as fallback
-    if (
-      previousVersion &&
-      (previousVersion.skills?.length > 0 ||
-        previousVersion.experience?.length > 0 ||
-        previousVersion.projects?.length > 0)
-    ) {
-      console.log("Error in parsing, using data from previous version");
-
-      return {
-        text: previousVersion.text || "",
-        skills: previousVersion.skills || [],
-        experience: previousVersion.experience || [],
-        projects: previousVersion.projects || [],
-        parsedAt: new Date(),
-        parseMethod: "previous_version_error_fallback",
-        warning:
-          "There was an error parsing your resume. Using previously stored data. Please review and update as needed.",
-      };
-    }
-
+    console.error("Error parsing resume:", error);
     throw error;
   }
 };

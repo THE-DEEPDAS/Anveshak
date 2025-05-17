@@ -7,7 +7,7 @@ import User from "../models/User.js";
 import Resume from "../models/Resume.js";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
-import { parseResumeText, generatePdfUrl } from "../services/resumeParser.js";
+import { parseResume, generatePdfUrl } from "../services/resumeParser.js";
 import { retryParseResume } from "../services/retryParser.js";
 import { authenticateToken } from "../middleware/auth.js";
 
@@ -67,8 +67,11 @@ router.post("/upload", authenticateToken, (req, res) => {
     } else if (err) {
       return res.status(400).json({ error: err.message });
     }
-
     try {
+      // Extract parseMode after multer has processed the multipart form data
+      const parseMode = req.body.parseMode || "auto";
+      console.log(`Resume upload with parseMode: ${parseMode}`);
+
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
@@ -157,11 +160,12 @@ router.post("/upload", authenticateToken, (req, res) => {
               projects: previousResume.projects || [],
               text: previousResume.text || "",
             }
-          : null;
-
-        // Race between parsing and timeout
+          : null; // Race between parsing and timeout
         parsedData = await Promise.race([
-          parseResumeText(result.public_id, previousVersionData),
+          parseResume(result.public_id, {
+            parseMode: parseMode,
+            previousVersionData,
+          }),
           timeoutPromise,
         ]);
 
