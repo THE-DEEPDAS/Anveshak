@@ -49,6 +49,8 @@ const resumeSchema = new mongoose.Schema(
         "regular",
         "ai",
         "combined",
+        "advanced",
+        "simplified",
         "manual_required",
         "previous_version",
         "previous_version_fallback",

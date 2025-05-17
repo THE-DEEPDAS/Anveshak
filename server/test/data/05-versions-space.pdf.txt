@@ -1,54 +1,211 @@
 
 
-DEEP DAS 
-seeking a position of software developer in your company to develop my knowledge and experience in
-the field of computer science and artificial intelligence while contributing to the company with my ability.
-deepdblm@gmail.com 982575xxxx navsari, India 
-EDUCATION 
-B.Tech in AI 
-SVNIT 
-current gpa :8.9 
-HSC board exam 
-GHSHEB 
-2023,  GPA:9.1 
-SSC board exam 
-CBSE 
-2021,  GPA:9.8 
-ACHIEVEMENTS 
-gold medalist at state level math olympiad 
-ahmedabad 
-runners up in national level ucmas abacus
-competition 
-surat 
-silver medal for 2 consecutive years at
-karate competiton 
-delhi 
-TECHNICAL SKILLS 
-Proficient in c language. 
-Competent in data structures and algorithms. 
-Excellent at java and java script. 
-TRAINING AND INTERNSHIP 
-open source contributor on git and github. 
-internship at sun corp in ai chat bot development 
-gsoc part time coder 
-SOFT SKILLS 
-excellent team leader and team player. 
-good management skills 
-best at communication and inter personal skills 
-HOBBIES AND INTERESTS 
-constant participation in hackathons 
-fond of reading books 
-silver medals for two years in karate competition 
-love playing chess 
-LANGUAGES 
-english 
-Full Professional Proficiency 
-hindi 
-Full Professional Proficiency 
-french 
-Limited Working Proficiency 
-gujarati 
-Full Professional Proficiency 
-REFERENCES 
-dr ravi malik ,ceo techblade. 
-mr m adhvani ,general manager sbi surat branch 
+Deep H. Das+91–99740–19394
+B.Tech - Artificial IntelligenceE–Mail | LinkedIn GitHub
+Sardar Vallabhbhai National Institute of Technology, SuratPortfolio | Codeforces | LeetCode
+Education
+Degree/CertificateInstitute/BoardCGPA/PercentileYear
+B.Tech in AINIT Surat9.542023–Present
+Higher SecondaryGSHSEB99.702022–2023
+SecondaryGSHSEB98.902020–2021
+Experience
+•
+Great NotesOct 2024 - Jan 2025
+Full Stack DeveloperRemote
+◦
+Designed, developed, and deployed a dynamic website from the ground up, ensuring robust functionality
+and scalability.
+◦
+Collaborated cross-functionally with designers and developers, streamlining the development lifecycle for
+optimal efficiency.
+◦
+Successfully launched a fully operational, commercially viable platform, demonstrating strong full-stack
+expertise.
+•
+PhysicsWallahApr 2024 - Jun 2024
+Subject Matter Expert (Physics)Remote
+◦
+Provided in-depth subject matter expertise, curating high-quality physics content for enhanced student
+learning.
+◦
+Developed comprehensive solutions and academic resources, ensuring accuracy and conceptual clarity.
+Projects
+•
+Capify - Personal Finance AssistantJul 2024 - Present
+Web ApplicationWebsite
+◦
+Developed a comprehensivefinance management platformwith tools forbudget tracking, expense
+management, and financial insights.
+◦
+ImplementedSplit-Smart, a feature simplifyingbill splittingand tracking shared expenses seamlessly.
+◦
+Designed variousrecommendation-based calculatorsto assist users in financial planning.
+◦
+Integrated ablogs & resources section, providing users with expert financial guidance, including articles,
+podcasts, and talks from industry leaders.
+◦
+Built anAI-driven stock market price prediction modelto help users make informed investment decisions.
+◦
+Developed apersonalized financial recommendation engine, providingfive key suggestionsbased on user
+data.
+◦
+Implemented aninvoice summarizer & data analyzer, automatically extracting insights from uploaded
+invoices.
+•
+Gesture Controlled SuiteMar 2024 - Jun 2024
+Computer Vision-Based ApplicationGitHub
+◦
+Developed anAI-powered gesture recognition systemenabling intuitive control over digital interfaces.
+◦
+Enhanced user experience by providing ahands-free, gesture-driven interfacefor various applications.
+◦
+Implementedgesture-based functionalities, includingmouse and keyboard control, PPT navigation, air
+draw, 3D object manipulation, Pomodoro timer, screenshots, and screen zoom.
+◦
+UtilizedOpenCV & MediaPipefor efficient real-time hand tracking and gesture classification.
+•
+WanderBotFeb. 2025 - Present
+GenAI-Powered Travel AssistantWebsite | GitHub
+◦
+Built anAI-powered travel assistantusingGemini Proto generatepersonalized travel itineraries.
+◦
+IntegratedEventbrite APIto fetch suggested travel destinations based on user preferences.
+◦
+UsedAviationStack APIto provide real-timeflight optionsfrom the user’s origin to their destination.
+◦
+Implemented atrain journey searchfeature, particularly useful for travel within India.
+◦
+Developed ahotel recommendation system, suggesting accommodations near the user’s destination.
+
+◦
+Added afun travel facts generatorto enhance user engagement and keep the wanderlust alive.
+◦
+Designed abeautiful and intuitive UIfor seamless user experience.
+•
+Agro We - Smart Agricultural PlatformMay. 2024 - Present
+Web-Based Decision Support SystemWebsite | GitHub
+◦
+Designed aweb app for precision agriculture, providing farmers withreal-time insightsfor better
+decision-making.
+◦
+Developed auser-friendly dashboardwith dynamic visualizations and aweather forecasting systemfor
+improved farm planning.
+◦
+Implemented arecommendation enginetailored tosoil type, crop selection, rainfall prediction, and
+farming season.
+◦
+Empowered farmers bysimplifying complex agricultural datainto actionable insights to boost productivity
+and sustainability.
+•
+AI-Driven Sustainability PlatformAug. 2024 - Present
+MERN Stack + AI for Environmental ImpactWebsite | GitHub
+◦
+Developed anAI-powered platformtoreduce paper cup wasteand promote sustainability.
+◦
+Created apersonalized tracking systemto monitorwaste reduction & chemical exposure savings.
+◦
+Designed adynamic impact dashboardwithreal-time analyticsand leaderboards.
+◦
+IntegratedGPT-2 & NLP for AI-powered eco recommendationsto guide users toward sustainable choices.
+◦
+Built aninteractive insights hubto provide users with the latest sustainability blogs, news, and
+eco-friendly practices.
+•
+Smart Healthcare PlatformSep. 2024 - Present
+AI-Powered Health Monitoring & Doctor BookingWebsite | GitHub
+◦
+Created areal-time health recommendation dashboard, updatingevery 5 minutesbased on
+Fitbit/smartwatch data.
+◦
+Developed ahealthcare platformofferingdoctor bookings, health analytics, and community support.
+◦
+Implementedlocation-based doctor bookingfor home visits.
+◦
+Builthealth metric calculatorsfor real-time health tracking.
+◦
+Designed anawareness pageproviding monthly insights intodiseases, symptoms, risks, prevention, and
+treatment.
+◦
+Integrated aMedicine Recommendation Systemofferingdrug alternatives and proper dosages.
+◦
+Built aMedicine Usage Helper, providingdetailed descriptions of medicine usage, side effects, and
+interactions.
+•
+Task Manager ApplicationFeb. 2025 - Present
+React Native-Based Task ManagementGitHub
+◦
+Developed aReact Native task managerenabling users tocreate, update, delete, and organize tasks.
+◦
+Implementedtask dependency management, allowing users to set and visualize dependencies between
+tasks.
+◦
+Designed anoverdue task lookup systemto highlight and manage missed deadlines effectively.
+◦
+Integrated atask scheduling featurefor users to plan and prioritize upcoming tasks efficiently.
+◦
+Built aninteractive task visualizationto provide a clear hierarchical view of task relationships.
+Skills
+•
+Programming Languages: Python, C++, C
+•
+Artificial Intelligence: Machine Learning, Deep Learning, Generative AI, RAG LLM, AI, Computer
+Vision
+•
+Web Development: React.js, Next.js, TypeScript, Javascript, Tailwind CSS, Bootstrap, Webflow,
+Wordpress
+•
+Databases & Tools: MongoDB, SQL, Qdrant, GitHub, Web Hosting
+•
+Other Skills: Competitive Programming, Data Structures and Algorithms, Prompt Engineering, Drone
+Making, Entrepreneurship
+
+Research Work
+•
+Robust Audio Forgery Detection using Deep Learning2024 - Present
+Digital Security and AI Research
+◦
+Proposed adeep-learning pipelinefordetecting audio forgeries, specificallydeepfake forgery.
+◦
+IntegratedMel-spectrogram, multi-scale feature fusion, and transformer-based attention mechanismsfor
+enhanced detection accuracy.
+◦
+Addressed challenges posed byoverlapping noise and complex forgery patterns, improving model
+generalization across diverse attack scenarios.
+◦
+Experimented on theASVspoof 2017 dataset, achievingstate-of-the-art performanceunder both clean and
+noisy conditions.
+◦
+Optimized the model forreal-time applicationsby incorporatingpreprocessing techniquesthat enhance
+detection accuracy.
+Achievements
+◦
+National Level GeeksForGeeks Hackathon (Avishkaar Season 2)- Secured3rd Runner-upposition.
+◦
+Statistella - IIT BHU National Level Data Analytics Competition- Secured3rd Runner-up.
+◦
+Autonomous Drone Development Challenge - ADDC 2025- SecuredAIR 2and2nd Position in Safe
+Design Category.
+◦
+10x Finalist Positions: Avishkaar, Statistella, BITS GOA AI Hackathon, Convolve 3.0 (PAN IIT AI
+Hackathon), Gujarat Vidyapeeth x Odoo Hackathon, Hackcrux, SAE India Business Plan Competition,
+Quarkz Hackathon, Gandhian Ideathon Competition.
+◦
+IICPC Merit Holder:Secured1324overall rank in the IICPC organised Codefest-2025.
+◦
+Codex (ACM_CEG)- Achieved4th placein 1st edition.
+◦
+Web Wonders (NEXUS, NIT Surat)-Runner-upin the Website Design Competition.
+◦
+Competitive Programming:Achieved a peak rating of1295 on Codeforces, successfully solving330+
+problems on Codeforces and 350+ on LeetCode.
+Positions of Responsibility
+•
+Junior Developer,Google Developers Group on CampusJan 2025 – Present
+•
+Co-Head,Technical Committee, MindBendNov. 2024 – Present
+•
+Senior Executive,Research and Innovation Counciljun 2024 – Present
+•
+Senior Technical Member and Web Dev Head,Phoenix Aero Drone DepartmentMar 2024 – Present
+•
+Member,Nexus: Departmental Cell of CSE and AISep 2023 – Present

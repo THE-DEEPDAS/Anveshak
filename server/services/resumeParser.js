@@ -8,6 +8,12 @@ import {
 import axios from "axios";
 import { v2 as cloudinary } from "cloudinary";
 import crypto from "crypto";
+import {
+  parseResumeText as parseSimplified,
+  formatResumeData,
+} from "./simplifiedResumeParser.js";
+import path from "path";
+import fs from "fs/promises";
 
 // Configure Cloudinary
 const configureCloudinary = () => {
@@ -1009,6 +1015,7 @@ const extractProjects = (text) => {
 
 export const parseResumeText = async (publicId, previousVersion = null) => {
   let dataBuffer = null;
+  let tempFilePath = null;
   try {
     console.log("Starting resume parsing for publicId:", publicId);
 
@@ -1045,12 +1052,48 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
     if (!dataBuffer && response && response.data) {
       dataBuffer = Buffer.from(response.data);
     }
-
     if (!dataBuffer) {
       throw new Error("Failed to obtain PDF data");
     }
 
     console.log("PDF downloaded successfully, parsing text...");
+
+    // Try simplified parser first
+    console.log("Attempting simplified parsing...");
+    try {
+      const parsedData = await parseSimplified(dataBuffer);
+      const formattedData = formatResumeData(parsedData);
+
+      if (
+        formattedData &&
+        ((formattedData.skills && formattedData.skills.length >= 3) ||
+          (formattedData.experience && formattedData.experience.length >= 1) ||
+          (formattedData.projects && formattedData.projects.length >= 1))
+      ) {
+        console.log("Simplified parsing successful!");
+        console.log(
+          `Found: ${formattedData.skills?.length || 0} skills, ${
+            formattedData.experience?.length || 0
+          } experiences, ${formattedData.projects?.length || 0} projects`
+        );
+
+        return {
+          text: parsedData.rawText || "",
+          skills: formattedData.skills || [],
+          experience: formattedData.experience || [],
+          projects: formattedData.projects || [],
+          parsedAt: new Date(),
+          parseMethod: "simplified",
+        };
+      } else {
+        console.log(
+          "Simplified parsing did not yield substantial results, falling back to traditional methods"
+        );
+      }
+    } catch (simplifiedError) {
+      console.error("Error in simplified parsing:", simplifiedError);
+      console.log("Falling back to traditional parsing methods");
+    }
 
     // Parse PDF with enhanced options for better text extraction
     const data = await pdfParse(dataBuffer, {
@@ -1091,7 +1134,7 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
 
     console.log("Successfully extracted text, length:", text.length);
 
-    // 1. Try regular parsing first with improved extractors
+    // Try regular parsing with improved extractors
     console.log("Attempting regular parsing...");
     const regularSkills = extractSkills(text);
     const regularExperience = extractExperience(text);
@@ -1220,6 +1263,15 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
             "Using data from previous version. Please review and update as needed.",
         };
       }
+      // Clean up temporary file if it exists
+      if (tempFilePath) {
+        try {
+          await fs.unlink(tempFilePath);
+          console.log("Temporary PDF file cleaned up");
+        } catch (cleanupError) {
+          console.error("Error cleaning up temporary PDF file:", cleanupError);
+        }
+      }
 
       // 5. Last resort: return empty data with a manual intervention warning
       const warningMessage =
@@ -1277,6 +1329,16 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
     }
   } catch (error) {
     console.error("Resume parsing error:", error);
+
+    // Clean up temporary file if it exists
+    if (tempFilePath) {
+      try {
+        await fs.unlink(tempFilePath);
+        console.log("Temporary PDF file cleaned up");
+      } catch (cleanupError) {
+        console.error("Error cleaning up temporary PDF file:", cleanupError);
+      }
+    }
 
     // If we have a previous version, use that as fallback
     if (
