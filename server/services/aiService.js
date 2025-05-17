@@ -328,7 +328,6 @@ export const findCompaniesForSkills = async (
 
   try {
     const model = getModel();
-
     // Combine skills and experience into a profile
     const profile = {
       skills: skills.join(", "),
@@ -348,22 +347,39 @@ export const findCompaniesForSkills = async (
       - role: Suitable role for the candidate
       - matchReason: Why this company is a good match
       
-      Return as JSON array.`;
+      Return as a strict JSON array, example:
+      [
+        {
+          "name": "Company Name",
+          "email": "email@company.com",
+          "role": "Position Title",
+          "matchReason": "Reason for match"
+        }
+      ]`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const responseText = response.text();
 
     try {
-      const jsonMatch =
-        responseText.match(/```json\n([\s\S]*)\n```/) ||
-        responseText.match(/```\n([\s\S]*)\n```/);
+      // First try to extract JSON from code blocks
+      const jsonMatch = responseText.match(/```(?:json)?\n([\s\S]*?)\n```/);
       if (jsonMatch && jsonMatch[1]) {
-        return JSON.parse(jsonMatch[1]);
+        // Clean the extracted JSON string
+        const cleanedJson = jsonMatch[1].trim();
+        return JSON.parse(cleanedJson);
       }
-      return JSON.parse(responseText);
+
+      // If no code blocks, try parsing the raw response
+      const cleanedResponse = responseText
+        .replace(/^[^\[]*\[/, "[") // Remove any text before the first [
+        .replace(/\][^\]]*$/, "]") // Remove any text after the last ]
+        .trim();
+
+      return JSON.parse(cleanedResponse);
     } catch (parseError) {
       console.error("Error parsing AI response:", parseError);
+      // If parsing fails, return mock data
       return getMockCompanies();
     }
   } catch (error) {
