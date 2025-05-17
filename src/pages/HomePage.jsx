@@ -26,8 +26,8 @@ const HomePage = () => {
           <Button
             variant="primary"
             size="lg"
-            onClick={() => navigate("/onboarding")}
-            className="bg-blue-600 text-white hover:bg-blue-100 hover:text-blue-700 font-semibold px-6 py-2 rounded border border-blue-300 transition"
+            onClick={() => navigate("/signup")}
+            className="bg-blue-600 text-white hover:bg-white hover:text-blue-600 font-semibold px-6 py-2 rounded border border-white transition duration-200"
           >
             Get Started
           </Button>

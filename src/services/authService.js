@@ -65,14 +65,14 @@ export const logout = async () => {
     delete axios.defaults.headers.common["Authorization"];
 
     // Clear AppContext user state by reloading the page
-    window.location.href = "/login";
+    window.location.href = "/";
   } catch (error) {
     console.error("Logout error:", error);
     // Still clear local data even if server request fails
     localStorage.removeItem("user");
     localStorage.removeItem("token");
     delete axios.defaults.headers.common["Authorization"];
-    window.location.href = "/login";
+    window.location.href = "/";
   }
 };
 
