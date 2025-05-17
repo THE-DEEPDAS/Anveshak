@@ -1055,28 +1055,46 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
     if (!dataBuffer) {
       throw new Error("Failed to obtain PDF data");
     }
-
     console.log("PDF downloaded successfully, parsing text...");
+    console.log("Using simplified parsing as default method...");
 
-    // Try simplified parser first
-    console.log("Attempting simplified parsing...");
+    // Clean up temporary file if it exists before parsing
+    if (tempFilePath) {
+      try {
+        await fs.unlink(tempFilePath);
+        console.log("Temporary PDF file cleaned up");
+      } catch (cleanupError) {
+        console.error("Error cleaning up temporary PDF file:", cleanupError);
+      }
+    }
     try {
+      // Log buffer info for debugging
+      console.log(
+        `Processing PDF buffer: ${
+          dataBuffer ? "Valid buffer" : "Invalid buffer"
+        }, Size: ${dataBuffer ? dataBuffer.length : 0} bytes`
+      );
+
+      // First attempt: Use simplified parser
       const parsedData = await parseSimplified(dataBuffer);
       const formattedData = formatResumeData(parsedData);
 
-      if (
-        formattedData &&
-        ((formattedData.skills && formattedData.skills.length >= 3) ||
-          (formattedData.experience && formattedData.experience.length >= 1) ||
-          (formattedData.projects && formattedData.projects.length >= 1))
-      ) {
-        console.log("Simplified parsing successful!");
-        console.log(
-          `Found: ${formattedData.skills?.length || 0} skills, ${
-            formattedData.experience?.length || 0
-          } experiences, ${formattedData.projects?.length || 0} projects`
-        );
+      console.log("Simplified parsing complete");
+      console.log(
+        `Found: ${formattedData.skills?.length || 0} skills, ${
+          formattedData.experience?.length || 0
+        } experiences, ${formattedData.projects?.length || 0} projects`
+      );
 
+      // Check if we have meaningful content from the simplified parser
+      const hasMinimalContent =
+        formattedData.skills.length > 0 ||
+        formattedData.experience.length > 0 ||
+        formattedData.projects.length > 0;
+
+      // If we have content, return it
+      if (hasMinimalContent) {
+        console.log("Simplified parser returned usable content, using results");
         return {
           text: parsedData.rawText || "",
           skills: formattedData.skills || [],
@@ -1085,246 +1103,98 @@ export const parseResumeText = async (publicId, previousVersion = null) => {
           parsedAt: new Date(),
           parseMethod: "simplified",
         };
-      } else {
-        console.log(
-          "Simplified parsing did not yield substantial results, falling back to traditional methods"
-        );
       }
+
+      // If simplified parser didn't find content, try AI parser
+      console.log(
+        "Simplified parser found no content, falling back to AI parser"
+      );
+      const rawText = parsedData.rawText || "";
+      if (rawText.length > 50) {
+        try {
+          console.log("Attempting AI parsing");
+          const aiResult = await parseResumeWithAI(rawText);
+
+          console.log("AI parsing complete");
+          console.log(
+            `AI found: ${aiResult.skills?.length || 0} skills, ${
+              aiResult.experience?.length || 0
+            } experiences, ${aiResult.projects?.length || 0} projects`
+          );
+
+          return {
+            text: rawText,
+            skills: aiResult.skills || [],
+            experience: aiResult.experience || [],
+            projects: aiResult.projects || [],
+            parsedAt: new Date(),
+            parseMethod: "ai",
+          };
+        } catch (aiError) {
+          console.error("Error in AI parsing:", aiError);
+          console.log("AI parser failed, returning simplified results");
+        }
+      }
+
+      // If AI parsing failed or couldn't be attempted, return simplified results
+      return {
+        text: parsedData.rawText || "",
+        skills: formattedData.skills || [],
+        experience: formattedData.experience || [],
+        projects: formattedData.projects || [],
+        parsedAt: new Date(),
+        parseMethod: "simplified",
+      };
     } catch (simplifiedError) {
       console.error("Error in simplified parsing:", simplifiedError);
-      console.log("Falling back to traditional parsing methods");
-    }
+      console.log("Simplified parser failed, attempting AI parser");
 
-    // Parse PDF with enhanced options for better text extraction
-    const data = await pdfParse(dataBuffer, {
-      pagerender: (pageData) => {
-        return pageData.getTextContent({
-          normalizeWhitespace: true,
-          disableCombineTextItems: false, // Ensure text items are properly combined
-        });
-      },
-      // Increase max content length to handle larger PDFs
-      max: 15 * 1024 * 1024, // 15MB
-    });
+      // Try to convert buffer to string to use with AI parser
+      try {
+        const rawText = dataBuffer.toString("utf8");
+        if (rawText && rawText.length > 50) {
+          try {
+            console.log(
+              "Attempting AI parsing after simplified parser failure"
+            );
+            const aiResult = await parseResumeWithAI(rawText);
 
-    if (!data || !data.text) {
-      throw new Error("Failed to extract text from PDF");
-    }
+            console.log("AI parsing complete after simplified parser failure");
+            console.log(
+              `AI found: ${aiResult.skills?.length || 0} skills, ${
+                aiResult.experience?.length || 0
+              } experiences, ${aiResult.projects?.length || 0} projects`
+            );
 
-    let text = data.text.trim();
-
-    // Text pre-processing to improve parsing
-    text = text
-      .replace(/\r\n/g, "\n") // Normalize line endings
-      .replace(/\f/g, "\n\n") // Replace form feeds with double newlines
-      .replace(/([A-Za-z0-9])(\n)([A-Za-z0-9])/g, "$1 $3") // Join words broken across lines
-      .replace(/\n{3,}/g, "\n\n"); // Replace multiple newlines with double newlines
-
-    if (text.length < 10) {
-      return {
-        text,
-        skills: [],
-        experience: [],
-        projects: [],
-        parsedAt: new Date(),
-        parseMethod: "failed",
-        warning: "Extracted text is too short to parse meaningfully",
-      };
-    }
-
-    console.log("Successfully extracted text, length:", text.length);
-
-    // Try regular parsing with improved extractors
-    console.log("Attempting regular parsing...");
-    const regularSkills = extractSkills(text);
-    const regularExperience = extractExperience(text);
-    const regularProjects = extractProjects(text);
-
-    // Check if we got substantial content from regular parsing
-    const hasSubstantialRegularContent =
-      regularSkills.length >= 3 ||
-      regularExperience.length >= 1 ||
-      regularProjects.length >= 1;
-
-    if (hasSubstantialRegularContent) {
-      console.log("Regular parsing successful");
-      console.log(
-        `Found: ${regularSkills.length} skills, ${regularExperience.length} experiences, ${regularProjects.length} projects`
-      );
-
-      return {
-        text,
-        skills: regularSkills,
-        experience: regularExperience,
-        projects: regularProjects,
-        parsedAt: new Date(),
-        parseMethod: "regular",
-      };
-    }
-
-    // 2. If regular parsing found limited content, try AI parsing
-    console.log("Regular parsing found minimal content, trying AI parsing...");
-    try {
-      const aiResult = await parseResumeWithAI(text);
-
-      // Check if AI returned substantial content
-      const hasSubstantialAiContent =
-        aiResult &&
-        (aiResult.skills?.length >= 3 ||
-          aiResult.experience?.length >= 1 ||
-          aiResult.projects?.length >= 1);
-
-      if (hasSubstantialAiContent) {
-        console.log("AI parsing successful");
-        console.log(
-          `AI Found: ${aiResult.skills?.length || 0} skills, ${
-            aiResult.experience?.length || 0
-          } experiences, ${aiResult.projects?.length || 0} projects`
-        );
-
-        return {
-          text,
-          ...aiResult,
-          parsedAt: new Date(),
-          parseMethod: "ai",
-        };
-      } // 3. If AI parsing didn't find enough content, combine both results
-      console.log("Combining regular and AI parsing results...");
-
-      // Prioritize AI skills but ensure we don't miss any skills from regular parsing
-      // This creates a more comprehensive skill list by combining both methods
-      const aiSkills = aiResult?.skills || [];
-      let combinedSkills = [...aiSkills];
-
-      // Add any regular skills that weren't found by AI
-      regularSkills.forEach((skill) => {
-        // Only add if not already present (case insensitive comparison)
-        if (
-          !combinedSkills.some((s) => s.toLowerCase() === skill.toLowerCase())
-        ) {
-          combinedSkills.push(skill);
+            return {
+              text: rawText,
+              skills: aiResult.skills || [],
+              experience: aiResult.experience || [],
+              projects: aiResult.projects || [],
+              parsedAt: new Date(),
+              parseMethod: "ai-fallback",
+            };
+          } catch (aiError) {
+            console.error("AI parser also failed:", aiError);
+          }
         }
-      });
-
-      // Merge experiences (prefer AI experiences if available, but add any missing regular experiences)
-      const combinedExperiences = [
-        ...new Set([...(aiResult?.experience || []), ...regularExperience]),
-      ];
-
-      // Merge projects (prefer AI projects if available, but add any missing regular projects)
-      const combinedProjects = [
-        ...new Set([...(aiResult?.projects || []), ...regularProjects]),
-      ];
-
-      const hasSomeCombinedContent =
-        combinedSkills.length > 0 ||
-        combinedExperiences.length > 0 ||
-        combinedProjects.length > 0;
-
-      if (hasSomeCombinedContent) {
-        const warningMessage =
-          combinedSkills.length < 3
-            ? "Limited skills detected. Please review and add any missing skills."
-            : "Resume parsed successfully with combined methods.";
-
-        console.log("Combined parsing partially successful");
-        console.log(
-          `Combined: ${combinedSkills.length} skills, ${combinedExperiences.length} experiences, ${combinedProjects.length} projects`
+      } catch (textConversionError) {
+        console.error(
+          "Failed to convert buffer to text for AI parsing:",
+          textConversionError
         );
-
-        return {
-          text,
-          skills: combinedSkills,
-          experience: combinedExperiences,
-          projects: combinedProjects,
-          parsedAt: new Date(),
-          parseMethod: "combined",
-          warning: warningMessage,
-        };
       }
 
-      // 4. If we still have no content, check for previous version data
-      if (
-        previousVersion &&
-        (previousVersion.skills?.length > 0 ||
-          previousVersion.experience?.length > 0 ||
-          previousVersion.projects?.length > 0)
-      ) {
-        console.log("Using data from previous version");
-
-        return {
-          text,
-          skills: previousVersion.skills || [],
-          experience: previousVersion.experience || [],
-          projects: previousVersion.projects || [],
-          parsedAt: new Date(),
-          parseMethod: "previous_version",
-          warning:
-            "Using data from previous version. Please review and update as needed.",
-        };
-      }
-      // Clean up temporary file if it exists
-      if (tempFilePath) {
-        try {
-          await fs.unlink(tempFilePath);
-          console.log("Temporary PDF file cleaned up");
-        } catch (cleanupError) {
-          console.error("Error cleaning up temporary PDF file:", cleanupError);
-        }
-      }
-
-      // 5. Last resort: return empty data with a manual intervention warning
-      const warningMessage =
-        "Automated parsing could not extract structured data. Please manually add your skills and experience.";
-      console.warn(warningMessage);
-
+      // If all attempts failed, return empty results
       return {
-        text,
+        text: "",
         skills: [],
         experience: [],
         projects: [],
         parsedAt: new Date(),
-        parseMethod: "manual_required",
-        warning: warningMessage,
-      };
-    } catch (aiError) {
-      console.error("AI parsing error:", aiError);
-
-      // Fallback to regular parsing results even if limited
-      const hasAnyRegularContent =
-        regularSkills.length > 0 ||
-        regularExperience.length > 0 ||
-        regularProjects.length > 0;
-
-      if (hasAnyRegularContent) {
-        const warningMessage =
-          "AI parsing failed, but some content was extracted. Please review and add missing information.";
-        console.warn(warningMessage);
-
-        return {
-          text,
-          skills: regularSkills,
-          experience: regularExperience,
-          projects: regularProjects,
-          parsedAt: new Date(),
-          parseMethod: "regular_fallback",
-          warning: warningMessage,
-        };
-      }
-
-      // If no content at all, return empty with warning
-      const warningMessage =
-        "Automated parsing had difficulties. Please manually add your skills and experience.";
-      console.warn(warningMessage);
-
-      return {
-        text,
-        skills: [],
-        experience: [],
-        projects: [],
-        parsedAt: new Date(),
-        parseMethod: "manual_required",
-        warning: warningMessage,
+        parseMethod: "simplified_failed",
+        warning:
+          "Simplified parsing failed. Please review and update the extracted data as needed.",
       };
     }
   } catch (error) {

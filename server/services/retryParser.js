@@ -65,8 +65,10 @@ export const retryParseResume = async (resumeId, forceAI = false) => {
         };
       }
     } else {
-      // Otherwise do a full parse attempt from the PDF again
-      console.log("Attempting full re-parse from PDF");
+      // Do a full parse attempt from the PDF again, will use simplified parser by default
+      console.log(
+        "Attempting full re-parse from PDF using simplified parser by default"
+      );
 
       try {
         parsedData = await parseResumeText(
