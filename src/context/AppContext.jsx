@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { getCurrentUser } from "../services/authService";
 import { useNavigate } from "react-router-dom";
-import { updateResume as updateResumeService } from "../services/resumeService";
+import {
+  updateResume as updateResumeService,
+  deleteSkill as deleteSkillService,
+} from "../services/resumeService";
 import { useToast } from "../components/ui/Toaster";
 
 const AppContext = createContext();
@@ -44,7 +47,7 @@ export const AppProvider = ({ children }) => {
           !location.pathname.startsWith("/signup") &&
           !location.pathname.startsWith("/verify")
         ) {
-          window.location.href = "/login";
+          window.location.href = "/";
         }
       } finally {
         setLoading(false);
@@ -53,6 +56,23 @@ export const AppProvider = ({ children }) => {
 
     initializeAuth();
   }, [location.pathname]);
+
+  // Fetch user emails when user is authenticated
+  useEffect(() => {
+    const fetchUserEmails = async () => {
+      if (!user?._id) return;
+
+      try {
+        const { getUserEmails } = await import("../services/emailService");
+        const userEmails = await getUserEmails(user._id);
+        setEmails(userEmails || []);
+      } catch (error) {
+        console.error("Error fetching user emails:", error);
+      }
+    };
+
+    fetchUserEmails();
+  }, [user]);
 
   // Save resume to localStorage when it changes
   useEffect(() => {
@@ -93,12 +113,45 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const deleteSkill = async (skillIndex) => {
+    if (!resume || !resume.id) {
+      showToast("No resume available", "error");
+      return;
+    }
+
+    try {
+      const response = await deleteSkillService(resume.id, skillIndex);
+
+      if (!response || !response.id) {
+        throw new Error("Invalid response from server");
+      }
+
+      setResume({
+        ...resume,
+        skills: response.skills || [],
+        parseStatus: response.parseStatus || "completed",
+      });
+
+      showToast("Skill removed successfully", "success");
+      return response;
+    } catch (error) {
+      console.error("Error deleting skill:", error);
+      const errorMessage =
+        typeof error === "string"
+          ? error
+          : error.message || "Failed to delete skill";
+      showToast(errorMessage, "error");
+      throw error;
+    }
+  };
+
   const value = {
     user,
     setUser,
     resume,
     setResume,
     updateResume,
+    deleteSkill,
     emails,
     setEmails,
     loading,

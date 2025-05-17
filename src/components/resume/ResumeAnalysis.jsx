@@ -9,10 +9,11 @@ import {
   FaSpinner,
   FaLightbulb,
   FaEdit,
+  FaTrash,
 } from "react-icons/fa";
 
 const ResumeAnalysis = () => {
-  const { resume, updateResume } = useAppContext();
+  const { resume, updateResume, deleteSkill } = useAppContext();
   const navigate = useNavigate();
   const { showToast } = useToast();
 
@@ -149,43 +150,99 @@ const ResumeAnalysis = () => {
                 >
                   {isEditingSkills ? "Cancel" : "Edit"}
                 </button>
-              </div>
+              </div>{" "}
               {isEditingSkills ? (
                 <div className="space-y-2">
                   {editableSkills.map((skill, index) => (
-                    <input
-                      key={index}
-                      type="text"
-                      value={skill}
-                      onChange={(e) => {
-                        const newSkills = [...editableSkills];
-                        newSkills[index] = e.target.value;
-                        setEditableSkills(newSkills);
-                      }}
-                      className="border p-2 w-full rounded"
-                    />
+                    <div key={index} className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        value={skill}
+                        onChange={(e) => {
+                          const newSkills = [...editableSkills];
+                          newSkills[index] = e.target.value;
+                          setEditableSkills(newSkills);
+                        }}
+                        className="border p-2 w-full rounded"
+                      />
+                      <button
+                        onClick={() => {
+                          const newSkills = [...editableSkills];
+                          newSkills.splice(index, 1);
+                          setEditableSkills(newSkills);
+                        }}
+                        className="text-red-600 hover:text-red-800 px-2 py-1 rounded"
+                        title="Delete skill"
+                      >
+                        ×
+                      </button>
+                    </div>
                   ))}
-                  <button
-                    onClick={() => setEditableSkills([...editableSkills, ""])}
-                    className="text-green-600 hover:text-green-800"
-                    disabled={isSaving}
-                  >
-                    + Add Skill
-                  </button>
-                  <button
-                    onClick={handleSaveSkills}
-                    className="ml-2 bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
-                    disabled={isSaving}
-                  >
-                    {isSaving ? "Saving..." : "Save"}
-                  </button>
+                  <div className="flex space-x-2 mt-4">
+                    <button
+                      onClick={() => setEditableSkills([...editableSkills, ""])}
+                      className="text-green-600 hover:text-green-800 border border-green-600 px-3 py-1 rounded"
+                      disabled={isSaving}
+                    >
+                      + Add Skill
+                    </button>
+                    <button
+                      onClick={() => setEditableSkills([])}
+                      className="text-red-600 hover:text-red-800 border border-red-600 px-3 py-1 rounded"
+                      disabled={isSaving}
+                    >
+                      Clear All
+                    </button>
+                    <button
+                      onClick={handleSaveSkills}
+                      className="ml-2 bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                      disabled={isSaving}
+                    >
+                      {isSaving ? "Saving..." : "Save"}
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <ul className="list-disc list-inside">
-                  {resume?.skills?.map((skill, index) => (
-                    <li key={index}>{skill}</li>
-                  ))}
-                </ul>
+                <div className="space-y-2">
+                  {resume?.skills?.length > 0 ? (
+                    <ul className="list-disc list-inside">
+                      {resume.skills.map((skill, index) => (
+                        <li
+                          key={index}
+                          className="flex items-center justify-between py-1"
+                        >
+                          <span>{skill}</span>
+                          <button
+                            onClick={async () => {
+                              try {
+                                setIsSaving(true);
+                                await deleteSkill(index);
+                                // No need to show toast as deleteSkill does it already
+                              } catch (error) {
+                                // Error handling is done in deleteSkill
+                                console.error(
+                                  "Error calling deleteSkill:",
+                                  error
+                                );
+                              } finally {
+                                setIsSaving(false);
+                              }
+                            }}
+                            className="text-red-600 hover:text-red-800"
+                            disabled={isSaving}
+                            title="Delete skill"
+                          >
+                            <FaTrash size={14} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-gray-500 italic">
+                      No skills found. Click Edit to add skills.
+                    </p>
+                  )}
+                </div>
               )}
             </div>
 

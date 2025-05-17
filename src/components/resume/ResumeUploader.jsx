@@ -1,17 +1,29 @@
 import React, { useState, useEffect } from "react";
 import { useAppContext } from "../../context/AppContext";
-import { uploadResume, getResumeById } from "../../services/resumeService";
+import {
+  uploadResume,
+  getResumeById,
+  retryParseResume,
+} from "../../services/resumeService";
 import { useNavigate } from "react-router-dom";
 import Button from "../ui/Button";
 import FileUpload from "../ui/FileUpload";
-import { FaSpinner } from "react-icons/fa";
+import {
+  FaSpinner,
+  FaSync,
+  FaRobot,
+  FaExclamationTriangle,
+  FaTrash,
+} from "react-icons/fa";
 import { useToast } from "../../components/ui/Toaster";
 
 const ResumeUploader = () => {
-  const { user, resume, setResume } = useAppContext();
+  const { user, resume, setResume, updateResume } = useAppContext();
   const [isUploading, setIsUploading] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [error, setError] = useState(null);
+  const [parseWarning, setParseWarning] = useState(null);
   const navigate = useNavigate();
   const { showToast } = useToast();
 
@@ -62,6 +74,59 @@ const ResumeUploader = () => {
       return () => clearInterval(pollInterval);
     }
   }, [resume?.id, resume?.parseStatus, setResume, showToast]);
+  // Handle retry parsing
+  const handleRetry = async (useAI = false) => {
+    if (!resume || !resume.id) {
+      showToast("No resume available to retry parsing", "error");
+      return;
+    }
+
+    setIsRetrying(true);
+    setError(null);
+
+    try {
+      const response = await retryParseResume(resume.id, useAI);
+
+      setResume({
+        ...resume,
+        ...response.resume,
+        skills: response.resume.skills || [],
+        experience: response.resume.experience || [],
+        projects: response.resume.projects || [],
+        parseStatus: response.resume.parseStatus,
+        warning: response.warning || null,
+      });
+
+      if (response.resume.parseStatus === "failed") {
+        setError(
+          "Retry parsing failed. Please try uploading a different file format."
+        );
+        showToast(
+          "Retry parsing failed. Please try uploading a different file format.",
+          "error"
+        );
+      } else if (response.warning) {
+        setParseWarning(response.warning);
+        showToast(
+          "Resume parsed with some limitations. " + response.warning,
+          "warning"
+        );
+      } else {
+        showToast("Resume successfully re-parsed!", "success");
+        setParseWarning(null);
+      }
+    } catch (error) {
+      console.error("Error retrying resume parsing:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to retry parsing";
+      setError(errorMessage);
+      showToast(errorMessage, "error");
+    } finally {
+      setIsRetrying(false);
+    }
+  };
 
   const handleUpload = async (file) => {
     if (!file) return;
@@ -84,6 +149,7 @@ const ResumeUploader = () => {
 
     setIsUploading(true);
     setError(null);
+    setParseWarning(null);
 
     try {
       const response = await uploadResume(formData);
@@ -95,6 +161,8 @@ const ResumeUploader = () => {
         skills: response.resume.skills || [],
         experience: response.resume.experience || [],
         projects: response.resume.projects || [],
+        warning: response.resume.warning || null,
+        parseMethod: response.resume.parseMethod,
       });
 
       if (response.resume.parseStatus === "failed") {
@@ -103,11 +171,17 @@ const ResumeUploader = () => {
       } else if (response.resume.parseStatus === "pending") {
         showToast("Resume uploaded, parsing in progress...", "info");
         setIsParsing(true);
+      } else if (response.resume.warning) {
+        setParseWarning(response.resume.warning);
+        showToast(
+          "Resume uploaded with some limitations: " + response.resume.warning,
+          "warning"
+        );
+        navigate("/dashboard");
       } else {
         showToast("Resume uploaded and parsed successfully!", "success");
+        navigate("/dashboard");
       }
-
-      navigate("/dashboard");
     } catch (error) {
       console.error("Error uploading resume:", error);
       const errorMessage =
@@ -120,7 +194,6 @@ const ResumeUploader = () => {
       setIsUploading(false);
     }
   };
-
   if (resume?.url) {
     return (
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -145,6 +218,120 @@ const ResumeUploader = () => {
             </a>
           </div>
 
+          {/* Parse status information */}
+          {(resume.parseStatus === "failed" ||
+            resume.warning ||
+            parseWarning) && (
+            <div
+              className={`p-4 rounded-md ${
+                resume.parseStatus === "failed"
+                  ? "bg-red-50 border border-red-200"
+                  : "bg-yellow-50 border border-yellow-200"
+              }`}
+            >
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <FaExclamationTriangle
+                    className={`h-5 w-5 ${
+                      resume.parseStatus === "failed"
+                        ? "text-red-500"
+                        : "text-yellow-500"
+                    }`}
+                  />
+                </div>
+                <div className="ml-3">
+                  <h3
+                    className={`text-sm font-medium ${
+                      resume.parseStatus === "failed"
+                        ? "text-red-800"
+                        : "text-yellow-800"
+                    }`}
+                  >
+                    {resume.parseStatus === "failed"
+                      ? "Resume Parsing Failed"
+                      : "Resume Parsing Warning"}
+                  </h3>
+                  <div
+                    className={`mt-2 text-sm ${
+                      resume.parseStatus === "failed"
+                        ? "text-red-700"
+                        : "text-yellow-700"
+                    }`}
+                  >
+                    <p>
+                      {resume.parseError?.message ||
+                        resume.warning ||
+                        parseWarning ||
+                        "There was an issue parsing your resume."}
+                    </p>
+                  </div>{" "}
+                  {/* Retry parsing options */}
+                  <div className="mt-4">
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => handleRetry(false)}
+                        disabled={isRetrying}
+                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-bold rounded-md text-black bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        <FaSync
+                          className={`mr-1 h-3 w-3 ${
+                            isRetrying ? "animate-spin" : ""
+                          }`}
+                        />
+                        <span className="font-bold text-black">
+                          {isRetrying ? "Retrying..." : "Retry Parsing"}
+                        </span>
+                      </Button>
+
+                      <Button
+                        type="button"
+                        onClick={() => handleRetry(true)}
+                        disabled={isRetrying}
+                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-bold rounded-md text-black bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        {" "}
+                        <FaRobot className="mr-1 h-3 w-3" />
+                        <span className="font-bold text-black">
+                          {isRetrying ? "Processing..." : "Try AI Parsing"}
+                        </span>
+                      </Button>
+
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          // First update resume with empty skills array
+                          updateResume({
+                            ...resume,
+                            skills: [],
+                          })
+                            .then(() => {
+                              // Then retry parsing with AI
+                              handleRetry(true);
+                            })
+                            .catch((error) => {
+                              showToast(
+                                "Error clearing skills: " +
+                                  (error.message || "Unknown error"),
+                                "error"
+                              );
+                            });
+                        }}
+                        disabled={isRetrying}
+                        className="inline-flex items-center px-3 py-1.5 border border-red-300 text-xs font-bold rounded-md text-black bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                      >
+                        <FaTrash className="mr-1 h-3 w-3" />
+                        <span className="font-bold text-black">
+                          Clear Skills & Parse
+                        </span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="border-t pt-4">
             <h3 className="text-lg font-medium text-gray-800 mb-2">
               Upload New Resume
@@ -154,14 +341,13 @@ const ResumeUploader = () => {
               accept=".pdf"
               maxSize={5}
               label="Upload a new resume to replace the current one (PDF only, max 5MB)"
-              disabled={isUploading || isParsing}
+              disabled={isUploading || isParsing || isRetrying}
             />
           </div>
         </div>
       </div>
     );
   }
-
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
       <h2 className="text-xl font-semibold text-gray-800 mb-4">
@@ -173,23 +359,74 @@ const ResumeUploader = () => {
           accept=".pdf"
           maxSize={5}
           label="Upload your resume (PDF only, max 5MB)"
-          disabled={isUploading || isParsing}
+          disabled={isUploading || isParsing || isRetrying}
         />
 
-        {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-red-600 text-sm">{error}</p>
+        {parseWarning && !error && (
+          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <FaExclamationTriangle className="h-5 w-5 text-yellow-400" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-700">{parseWarning}</p>
+              </div>
+            </div>
           </div>
         )}
 
-        {(isUploading || isParsing) && (
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <FaExclamationTriangle className="h-5 w-5 text-red-400" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">{error}</p>
+                {resume?.id && (
+                  <div className="mt-3">
+                    {" "}
+                    <Button
+                      onClick={() => handleRetry(true)}
+                      disabled={isRetrying}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      <FaRobot className="mr-2 h-4 w-4" />
+                      <span className="font-bold">
+                        {isRetrying
+                          ? "Processing..."
+                          : "Try Advanced AI Parsing"}
+                      </span>
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {(isUploading || isParsing || isRetrying) && (
           <div className="flex items-center justify-center py-4">
             <FaSpinner className="animate-spin h-6 w-6 text-blue-600" />
             <span className="ml-2 text-gray-600">
-              {isUploading ? "Uploading resume..." : "Parsing resume..."}
+              {isUploading
+                ? "Uploading resume..."
+                : isRetrying
+                ? "Retrying resume parsing..."
+                : "Parsing resume..."}
             </span>
           </div>
         )}
+
+        <div className="text-sm text-gray-500 mt-2">
+          <p>Having trouble? Make sure your resume:</p>
+          <ul className="list-disc list-inside mt-1 ml-2">
+            <li>Is a valid PDF file (not password protected)</li>
+            <li>Contains text that can be selected (not just images)</li>
+            <li>Has clear section headers like "Skills", "Experience", etc.</li>
+            <li>Has common formatting (headings, bullets, etc.)</li>
+          </ul>
+        </div>
       </div>
     </div>
   );

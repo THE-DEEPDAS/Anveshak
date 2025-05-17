@@ -7,6 +7,7 @@ import HomePage from "./pages/HomePage";
 import OnboardingPage from "./pages/OnboardingPage";
 import DashboardPage from "./pages/DashboardPage";
 import EmailsPage from "./pages/EmailsPage";
+import EmailDetailPage from "./pages/EmailDetailPage";
 import ProtectedRoute from "./components/layout/ProtectedRoute";
 import LandingPage from "./pages/LandingPage";
 import { AppProvider } from "./context/AppContext";
@@ -24,10 +25,9 @@ const router = {
 
 function App() {
   return (
-    
-      <ToastProvider>
+    <ToastProvider>
       <Router {...router}>
-      <AppProvider>
+        <AppProvider>
           <div className="flex flex-col min-h-screen bg-gray-50">
             <Navbar />
             <main className="flex-grow">
@@ -51,17 +51,31 @@ function App() {
                       <DashboardPage />
                     </ProtectedRoute>
                   }
+                />{" "}
+                <Route
+                  path="/emails"
+                  element={
+                    <ProtectedRoute>
+                      <EmailsPage />
+                    </ProtectedRoute>
+                  }
                 />
-                <Route path="/emails" element={<EmailsPage />} />
+                <Route
+                  path="/emails/:emailId"
+                  element={
+                    <ProtectedRoute>
+                      <EmailDetailPage />
+                    </ProtectedRoute>
+                  }
+                />
               </Routes>
             </main>
             <Footer />
             <Toaster />
           </div>
-          </AppProvider>
-        </Router>
-      </ToastProvider>
-    
+        </AppProvider>
+      </Router>
+    </ToastProvider>
   );
 }
 

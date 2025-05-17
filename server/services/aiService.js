@@ -18,12 +18,17 @@ export const getSkillsFromText = async (text) => {
   try {
     const model = getModel();
     const prompt = `
-      Extract technical skills from the following resume text.
+      Extract all technical skills from the following resume text.
       - Look for sections labeled "Skills", "Technical Skills", "Technologies", etc.
       - For sections with bullet points or comma-separated lists, extract those directly
       - For skills written in sentences, extract individual technical terms
       - Remove common words and focus on technical terms, tools, frameworks, and languages
+      - Be thorough and extract ALL technical skills mentioned anywhere in the resume
+      - Include programming languages, frameworks, libraries, tools, platforms, methodologies
+      - Look in experience and project descriptions for mentioned technologies
       - Return ONLY an array of strings with no other text or explanation
+      - Format each skill consistently (proper capitalization for acronyms like "HTML", "CSS")
+      - For compound skills like "React.js", keep them as one skill
       
       Resume text:
       ${text}
@@ -36,24 +41,42 @@ export const getSkillsFromText = async (text) => {
     // Parse response as JSON array
     let skills;
     try {
-      // Clean the text to make it a valid array
-      const cleanedText = responseText.replace(/```json|```|\[|\]/g, "").trim();
-      const itemsText = `[${cleanedText}]`;
-      skills = JSON.parse(itemsText);
+      // Handle different JSON formatting in the response
+      if (responseText.includes("[") && responseText.includes("]")) {
+        // Extract the array part if it exists
+        const arrayMatch = responseText.match(/\[([^\]]*)\]/);
+        if (arrayMatch && arrayMatch[1]) {
+          const cleanedText = arrayMatch[1].trim();
+          const itemsText = `[${cleanedText}]`;
+          skills = JSON.parse(itemsText);
+        } else {
+          // If we can't extract just the array part, try parsing the whole response
+          skills = JSON.parse(responseText);
+        }
+      } else {
+        // Clean the text to make it a valid array
+        const cleanedText = responseText
+          .replace(/```json|```|\[|\]/g, "")
+          .trim();
+        const itemsText = `[${cleanedText}]`;
+        skills = JSON.parse(itemsText);
+      }
     } catch (parseError) {
+      console.log("Error parsing skills JSON:", parseError);
+
       // Enhanced fallback parsing
       skills = responseText
         .split(/[,\n]/) // Split by commas or newlines
         .map((skill) =>
           skill
-            .replace(/[^\w\s-+#]/g, "") // Remove special chars except -, +, #
+            .replace(/[^\w\s-+#.]/g, "") // Remove special chars except -, +, #, .
             .trim()
         )
         .filter(
           (skill) =>
             skill &&
             skill.length >= 2 && // Must be at least 2 chars
-            !/^(and|or|in|with|using|including)$/i.test(skill) // Filter common connecting words
+            !/^(and|or|in|with|using|including|the|for|to)$/i.test(skill) // Filter common connecting words
         );
     }
 
@@ -157,30 +180,58 @@ export const parseResumeWithAI = async (text) => {
   try {
     const model = getModel();
     const prompt = `
-      You are an expert resume parser. Parse this resume text and extract the following information accurately:
+      You are an expert resume parser with extensive knowledge of technical fields, job roles, and industries. Parse this resume text and extract the following information with maximum accuracy:
 
-      1.  **Technical Skills**: Identify and list all technical skills. This includes programming languages (e.g., Python, Java, JavaScript), frameworks (e.g., React, Angular, Node.js), databases (e.g., SQL, MongoDB), tools (e.g., Git, Docker, Jenkins), cloud platforms (e.g., AWS, Azure, GCP), operating systems, and other relevant technologies. Extract skills even if mentioned within descriptive sentences.
-      2.  **Work Experience**: Extract all work experiences. For each experience, include the job title/role, company name, employment dates (if available), and a summary of key responsibilities, achievements, or technologies used. If dates are not explicitly stated, note that. If a section is titled "Internships" or "Training", treat entries within as experiences.
-      3.  **Projects**: Extract all academic, personal, or professional projects. For each project, include the project name or a descriptive title, and a summary of its purpose, key features, or technologies used. If experience entries seem more like projects (e.g., "Developed a mobile app for X"), classify them as projects if they don't fit a formal work experience structure.
+      1. **Technical Skills**: Identify and list ALL technical skills throughout the entire resume. This includes:
+         - Programming languages (e.g., Python, Java, JavaScript, TypeScript, C++, C#, Ruby)
+         - Frameworks & libraries (e.g., React, Angular, Vue, Django, Flask, Spring, Express)
+         - Databases (e.g., SQL, MySQL, PostgreSQL, MongoDB, Redis, DynamoDB)
+         - Cloud services (e.g., AWS, GCP, Azure, Firebase, Heroku, Netlify)
+         - DevOps tools (e.g., Docker, Kubernetes, Jenkins, GitHub Actions, CircleCI)
+         - Version control systems (e.g., Git, GitHub, GitLab, BitBucket)
+         - Design tools (e.g., Figma, Adobe XD, Sketch, Photoshop)
+         - Project management tools (e.g., Jira, Asana, Trello, Notion)
+         - Methodologies (e.g., Agile, Scrum, Kanban, TDD, BDD)
+         - Look for skills within experience descriptions and project details, not just skills sections
+         - Extract skills even if briefly mentioned or part of a list
+         - Look for domain-specific technologies and tools
 
-      Important parsing rules:
-      -   Focus on extracting factual information for skills, experience, and projects.
-      -   For Skills: Extract individual skills/technologies. "Experience with Python and Django" should yield "Python" and "Django".
-      -   For Experience: Clearly separate distinct roles or internships.
-      -   For Projects: Clearly separate distinct projects.
-      -   Handle various resume formats, including those with unconventional section titles or less structured text.
-      -   Preserve technical terms exactly as written.
-      -   Remove any redundant or duplicate information within each category.
-      -   If a section is missing (e.g., no explicit "Projects" section), return an empty array for that field.
+      2. **Work Experience**: Extract ALL work experiences, including:
+         - Role/title and company name as the first part of each entry
+         - Employment dates (if available)
+         - Concise summary of responsibilities, achievements, and technologies used
+         - Include internships, part-time roles, freelance work, and volunteer positions
+         - Separate each distinct role into its own entry
+         - Keep entries concise but include key details about technologies used and accomplishments
+
+      3. **Projects**: Extract ALL projects mentioned, including:
+         - Project name/title as the first part of each entry
+         - Brief description of purpose and functionality
+         - Technologies, frameworks, and tools used
+         - Key features implemented or challenges overcome
+         - Include both personal and professional projects
+         - Include academic projects if mentioned
+
+      Critical parsing instructions:
+      - Be extremely thorough in extracting ALL technical skills mentioned anywhere in the resume
+      - For skills in experience descriptions, extract the specific technologies (e.g., "Built RESTful APIs using Node.js and Express" → extract "Node.js" and "Express")
+      - Format all entries consistently and ensure they're readable
+      - Preserve technical terms with their exact capitalization (e.g., "React", "TypeScript", "AWS")
+      - If the resume is in a non-standard format, make your best effort to identify and categorize content
+      - If you're uncertain about a section or entry, include it in the most appropriate category
+      - For resumes with limited content, be extra thorough in extracting every possible skill
+      - Keep experience and project descriptions under 250 characters each for readability
+      - For any potentially valuable skills or experience, err on the side of including them
+      - Ensure skills are properly separated (e.g., "React.js" is one skill, not "React" and "js")
 
       Resume text:
       ${text}
 
-      Return ONLY a JSON object with this exact structure (no other text or explanations):
+      Return ONLY a JSON object with this exact structure (no markdown, no explanations):
       {
         "skills": ["skill1", "skill2", ...],
-        "experience": ["description of experience 1 (e.g., Role at Company, Dates: Summary)", "description of experience 2", ...],
-        "projects": ["description of project 1 (e.g., Project Name: Summary)", "description of project 2", ...]
+        "experience": ["Role at Company, Dates: Brief description with responsibilities and technologies", ...],
+        "projects": ["Project Name: Brief description with purpose and technologies used", ...]
       }
     `;
 

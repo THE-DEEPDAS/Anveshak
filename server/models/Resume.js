@@ -4,6 +4,8 @@ const parseResultSchema = new mongoose.Schema({
   skills: [{ type: String, trim: true }],
   experience: [{ type: String, trim: true }],
   projects: [{ type: String, trim: true }],
+  parseMethod: { type: String }, // Track which parsing method was used
+  warning: { type: String }, // Store any warnings at the history level
   parsedAt: { type: Date, default: Date.now },
 });
 
@@ -41,18 +43,34 @@ const resumeSchema = new mongoose.Schema(
       type: Number,
       default: 1,
     },
+    parseMethod: {
+      type: String,
+      enum: [
+        "regular",
+        "ai",
+        "combined",
+        "manual_required",
+        "previous_version",
+        "previous_version_fallback",
+        "previous_version_error_fallback",
+        "regular_fallback",
+        "failed",
+        "partial",
+      ],
+    },
     lastParseAttempt: {
       type: Date,
       default: Date.now,
     },
     parseStatus: {
       type: String,
-      enum: ["pending", "completed", "failed"],
+      enum: ["pending", "completed", "failed", "partial"],
       default: "pending",
     },
     parseError: {
       message: String,
       timestamp: Date,
+      stack: String, // Store stack trace for debugging
     },
     warning: { type: String }, // Store parsing warnings
     createdAt: {
@@ -62,6 +80,11 @@ const resumeSchema = new mongoose.Schema(
     updatedAt: {
       type: Date,
       default: Date.now,
+    },
+    lastModifiedBy: {
+      type: String,
+      enum: ["system", "user", "ai"],
+      default: "system",
     },
   },
   {
@@ -73,33 +96,85 @@ const resumeSchema = new mongoose.Schema(
 resumeSchema.index({ user: 1, createdAt: -1 });
 resumeSchema.index({ cloudinaryPublicId: 1 }, { unique: true });
 
-// Method to update parse results
+// Enhanced method to update parse results with more details
 resumeSchema.methods.updateParseResults = function (parseResults) {
   this.text = parseResults.text; // Store raw text
+
+  // Replace (not append) skills, experience, and projects with new values
   this.skills = parseResults.skills || [];
   this.experience = parseResults.experience || [];
   this.projects = parseResults.projects || [];
+
   this.warning = parseResults.warning; // Store any warnings
+  this.parseMethod = parseResults.parseMethod || "regular";
+
+  // Add to parse history with method and warnings
   this.parseHistory.push({
     skills: this.skills,
     experience: this.experience,
     projects: this.projects,
-    parsedAt: new Date(),
+    parseMethod: this.parseMethod,
+    warning: this.warning,
+    parsedAt: parseResults.parsedAt || new Date(),
   });
+
   this.currentVersion += 1;
-  this.parseStatus = "completed";
+
+  // Set status based on content and warnings
+  if (
+    this.skills.length === 0 &&
+    this.experience.length === 0 &&
+    this.projects.length === 0
+  ) {
+    this.parseStatus = "partial";
+  } else {
+    this.parseStatus = "completed";
+  }
+
+  this.lastParseAttempt = new Date();
+  this.lastModifiedBy = "system";
+  return this.save();
+};
+
+// Enhanced method to mark parsing as failed with more details
+resumeSchema.methods.markParseFailed = function (error) {
+  this.parseStatus = "failed";
+  this.parseMethod = "failed";
+  this.parseError = {
+    message: error.message || "Unknown error parsing resume",
+    timestamp: new Date(),
+    stack: error.stack || null,
+  };
   this.lastParseAttempt = new Date();
   return this.save();
 };
 
-// Method to mark parsing as failed
-resumeSchema.methods.markParseFailed = function (error) {
-  this.parseStatus = "failed";
-  this.parseError = {
-    message: error.message,
-    timestamp: new Date(),
-  };
-  this.lastParseAttempt = new Date();
+// Method for manual updates from user
+resumeSchema.methods.updateManually = function (userData) {
+  // Store previous values in history before updating
+  this.parseHistory.push({
+    skills: this.skills || [],
+    experience: this.experience || [],
+    projects: this.projects || [],
+    parseMethod: this.parseMethod,
+    warning: this.warning,
+    parsedAt: new Date(),
+  });
+
+  // Update with user-provided data
+  if (userData.skills !== undefined) this.skills = userData.skills;
+  if (userData.experience !== undefined) this.experience = userData.experience;
+  if (userData.projects !== undefined) this.projects = userData.projects;
+
+  // Clear warnings and errors since user has manually fixed
+  this.warning = null;
+  this.parseError = null;
+
+  // Update metadata
+  this.currentVersion += 1;
+  this.lastModifiedBy = "user";
+  this.parseStatus = "completed"; // Manual edits always set status to completed
+
   return this.save();
 };
 

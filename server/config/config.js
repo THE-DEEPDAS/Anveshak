@@ -74,7 +74,28 @@ const cookieConfig = {
 
 // CORS settings
 const corsConfig = {
-  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl, etc.)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    // Parse the allowed origins from the environment variable
+    const allowedOrigins = (
+      process.env.FRONTEND_URLS ||
+      process.env.FRONTEND_URL ||
+      "http://localhost:5173"
+    )
+      .split(",")
+      .map((url) => url.trim());
+
+    // Check if the origin is in our allowed list
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error(`Origin ${origin} not allowed by CORS policy`));
+    }
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
@@ -99,6 +120,13 @@ export const config = {
   },
   frontend: {
     url: process.env.FRONTEND_URL || "http://localhost:5173",
+    urls: (
+      process.env.FRONTEND_URLS ||
+      process.env.FRONTEND_URL ||
+      "http://localhost:5173"
+    )
+      .split(",")
+      .map((url) => url.trim()),
   },
   jwt: {
     secret: process.env.JWT_SECRET || "your-secret-key",

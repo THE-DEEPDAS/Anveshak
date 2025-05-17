@@ -47,7 +47,7 @@ const Navbar = () => {
       await logout();
       hasCheckedResume.current = false; // Reset the check for next login
       setResume(null);
-      navigate("/onboarding");
+      navigate("/login");
     } catch (error) {
       console.error("Logout error:", error);
     }

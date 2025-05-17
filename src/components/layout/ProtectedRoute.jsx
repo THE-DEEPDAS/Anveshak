@@ -18,7 +18,7 @@ const ProtectedRoute = ({ children }) => {
 
   // Only redirect if there's no token and no user
   if (!token && !user) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+    return <Navigate to="/onboarding" state={{ from: location.pathname }} replace />;
   }
 
   return children;

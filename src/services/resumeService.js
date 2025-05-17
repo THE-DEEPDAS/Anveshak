@@ -71,6 +71,59 @@ export const updateResume = async (resumeData) => {
   }
 };
 
+/**
+ * Retry parsing a resume when the initial parsing wasn't successful
+ * @param {string} resumeId - ID of the resume to retry parsing
+ * @param {boolean} forceAI - Whether to force AI parsing even if regular parsing succeeds
+ * @returns {Promise<Object>} - Updated resume data
+ */
+export const retryParseResume = async (resumeId, forceAI = false) => {
+  try {
+    const response = await axios.post(
+      `${API_ENDPOINTS.resumes}/${resumeId}/retry-parse`,
+      { forceAI }
+    );
+
+    if (!response.data) {
+      throw new Error("No response from server");
+    }
+
+    return response.data;
+  } catch (error) {
+    console.error("Error retrying resume parsing:", error);
+    throw (
+      error.response?.data?.message ||
+      error.message ||
+      "Error retrying resume parsing"
+    );
+  }
+};
+
+/**
+ * Delete a specific skill from a resume
+ * @param {string} resumeId - Resume ID
+ * @param {number} skillIndex - Index of the skill to remove
+ * @returns {Promise<Object>} - Updated resume data
+ */
+export const deleteSkill = async (resumeId, skillIndex) => {
+  try {
+    const response = await axios.delete(
+      `${API_ENDPOINTS.resumes}/${resumeId}/skills/${skillIndex}`
+    );
+
+    if (!response.data) {
+      throw new Error("No response from server");
+    }
+
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting skill:", error);
+    throw (
+      error.response?.data?.message || error.message || "Error deleting skill"
+    );
+  }
+};
+
 // Mock function for development
 export const getMockResumeData = () => {
   return {

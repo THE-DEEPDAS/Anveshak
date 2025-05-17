@@ -3,9 +3,10 @@ import { useNavigate } from "react-router-dom";
 import ResumeUploader from "../components/resume/ResumeUploader";
 import ResumeAnalysis from "../components/resume/ResumeAnalysis";
 import EmailGenerator from "../components/emails/EmailGenerator";
+import EmailStats from "../components/emails/EmailStats";
 import Button from "../components/ui/Button";
 import { useAppContext } from "../context/AppContext";
-import { FaEnvelope, FaUpload } from "react-icons/fa";
+import { FaEnvelope, FaUpload, FaChartBar } from "react-icons/fa";
 
 const DashboardPage = () => {
   const navigate = useNavigate();
@@ -60,17 +61,18 @@ const DashboardPage = () => {
                   </div>
                   <ResumeUploader />
                 </div>
-              </div>
-
+              </div>{" "}
               <ResumeAnalysis />
-
               {canShowEmailGenerator() && (
                 <>
                   <div className="bg-white rounded-lg shadow-md p-6">
                     <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-xl font-semibold text-gray-800">
-                        Email Status
-                      </h2>
+                      <div className="flex items-center">
+                        <FaChartBar className="h-5 w-5 text-blue-500 mr-2" />
+                        <h2 className="text-xl font-semibold text-gray-800">
+                          Email Analytics
+                        </h2>
+                      </div>
                       <Button
                         variant="outline"
                         size="sm"
@@ -81,36 +83,7 @@ const DashboardPage = () => {
                       </Button>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                        <p className="text-sm text-blue-700 mb-1">
-                          Total Emails
-                        </p>
-                        <p className="text-2xl font-bold text-blue-800">
-                          {emails.length}
-                        </p>
-                      </div>
-
-                      <div className="bg-green-50 p-4 rounded-lg border border-green-100">
-                        <p className="text-sm text-green-700 mb-1">Sent</p>
-                        <p className="text-2xl font-bold text-green-800">
-                          {
-                            emails.filter((email) => email.status === "sent")
-                              .length
-                          }
-                        </p>
-                      </div>
-
-                      <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
-                        <p className="text-sm text-purple-700 mb-1">Pending</p>
-                        <p className="text-2xl font-bold text-purple-800">
-                          {
-                            emails.filter((email) => email.status === "draft")
-                              .length
-                          }
-                        </p>
-                      </div>
-                    </div>
+                    <EmailStats />
                   </div>
 
                   <EmailGenerator />

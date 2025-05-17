@@ -8,6 +8,7 @@ import Resume from "../models/Resume.js";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { parseResumeText, generatePdfUrl } from "../services/resumeParser.js";
+import { retryParseResume } from "../services/retryParser.js";
 import { authenticateToken } from "../middleware/auth.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -53,7 +54,7 @@ const upload = multer({
 
 const router = express.Router();
 
-// Upload resume with custom error handling
+// Upload resume with enhanced error handling and validation
 router.post("/upload", authenticateToken, (req, res) => {
   upload(req, res, async (err) => {
     if (err instanceof multer.MulterError) {
@@ -78,7 +79,31 @@ router.post("/upload", authenticateToken, (req, res) => {
           .json({ error: "User not properly authenticated" });
       }
 
-      // Upload to Cloudinary with better configuration
+      // Check if file is actually a PDF (more thorough validation)
+      const fileBuffer = fs.readFileSync(req.file.path);
+      const isPDF = fileBuffer.toString("ascii", 0, 5) === "%PDF-";
+
+      if (!isPDF) {
+        // Clean up invalid file
+        fs.unlink(req.file.path, (err) => {
+          if (err) console.error("Error deleting invalid file:", err);
+        });
+        return res.status(400).json({ error: "Invalid PDF file format" });
+      }
+
+      // Get the most recent resume for this user (if it exists) to use as fallback
+      let previousResume = null;
+      try {
+        previousResume = await Resume.findOne({
+          user: req.user.userId,
+        }).sort({ createdAt: -1 });
+      } catch (prevError) {
+        console.log("No previous resume found, continuing without fallback");
+      }
+
+      console.log(`Uploading resume to Cloudinary: ${req.file.filename}`);
+
+      // Upload to Cloudinary with enhanced configuration for reliability
       const result = await cloudinary.uploader.upload(req.file.path, {
         resource_type: "raw",
         public_id: req.file.filename,
@@ -86,11 +111,15 @@ router.post("/upload", authenticateToken, (req, res) => {
         use_filename: true,
         unique_filename: true,
         type: "upload",
-        timeout: 120000, // 120 second timeout
-        chunk_size: 10000000, // 10MB chunks
+        timeout: 180000, // 180 second timeout
+        chunk_size: 6000000, // 6MB chunks for more reliable upload
         eager_async: true,
         eager_notification_url: null,
+        tags: ["resume", `user_${req.user.userId}`],
+        overwrite: true,
       });
+
+      console.log(`Resume uploaded to Cloudinary: ${result.public_id}`);
 
       // Clean up local file
       fs.unlink(req.file.path, (err) => {
@@ -108,15 +137,62 @@ router.post("/upload", authenticateToken, (req, res) => {
       });
 
       await resume.save();
+      console.log(`Resume record created with ID: ${resume._id}`);
+
+      // Set up timeout protection for the parsing process
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error("Resume parsing timed out after 90 seconds"));
+        }, 90000); // 90 second timeout
+      });
 
       let parsedData;
       try {
         // Pass the full public_id which includes the folder path
-        parsedData = await parseResumeText(result.public_id);
+        // Also pass the previous version for fallback
+        const previousVersionData = previousResume
+          ? {
+              skills: previousResume.skills || [],
+              experience: previousResume.experience || [],
+              projects: previousResume.projects || [],
+              text: previousResume.text || "",
+            }
+          : null;
+
+        // Race between parsing and timeout
+        parsedData = await Promise.race([
+          parseResumeText(result.public_id, previousVersionData),
+          timeoutPromise,
+        ]);
+
         await resume.updateParseResults(parsedData);
+        console.log(
+          `Resume parsed successfully with method: ${parsedData.parseMethod}`
+        );
       } catch (parseError) {
         console.error("Resume parsing error:", parseError);
         await resume.markParseFailed(parseError);
+
+        // If parsing failed but we have previous data, use that as fallback
+        if (
+          previousResume &&
+          previousResume.skills &&
+          previousResume.skills.length > 0
+        ) {
+          console.log(
+            "Using previous resume data as fallback after parse failure"
+          );
+          await resume.updateParseResults({
+            skills: previousResume.skills,
+            experience: previousResume.experience,
+            projects: previousResume.projects,
+            text: previousResume.text || "",
+            parseMethod: "previous_version_fallback",
+            warning:
+              "Parsing failed. Using data from your previous resume as a starting point.",
+            parsedAt: new Date(),
+          });
+        }
       }
 
       // Use the actual secure_url from Cloudinary for consistency
@@ -257,6 +333,108 @@ router.patch("/:id", authenticateToken, async (req, res) => {
     console.error("Error updating resume:", error);
     res.status(500).json({
       message: "Error updating resume",
+      error: error.message,
+    });
+  }
+});
+
+// Retry parsing a resume
+router.post("/:id/retry-parse", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { forceAI } = req.body;
+
+    // Verify the resume belongs to the requesting user
+    const resume = await Resume.findOne({
+      _id: id,
+      user: req.user.userId,
+    });
+
+    if (!resume) {
+      return res.status(404).json({ message: "Resume not found" });
+    }
+
+    console.log(`Requesting retry parse for resume ${id}, forceAI: ${forceAI}`);
+
+    // Attempt to retry parsing
+    const updatedResume = await retryParseResume(id, forceAI === true);
+
+    // Generate fresh authenticated URL
+    const authenticatedUrl = generatePdfUrl(updatedResume.cloudinaryPublicId);
+
+    res.json({
+      message:
+        updatedResume.parseStatus === "completed"
+          ? "Resume parsing retry successful"
+          : "Resume parsing retry completed with warnings",
+      resume: {
+        ...updatedResume.toObject(),
+        url: authenticatedUrl,
+      },
+      warning: updatedResume.warning,
+    });
+  } catch (error) {
+    console.error("Error retrying resume parse:", error);
+    res.status(500).json({
+      message: "Error retrying resume parse",
+      error: error.message,
+    });
+  }
+});
+
+// Delete an individual skill from a resume
+router.delete("/:id/skills/:index", authenticateToken, async (req, res) => {
+  try {
+    const { id, index } = req.params;
+    const skillIndex = parseInt(index);
+
+    // Input validation
+    if (isNaN(skillIndex) || skillIndex < 0) {
+      return res.status(400).json({ message: "Invalid skill index" });
+    }
+
+    const resume = await Resume.findOne({
+      _id: id,
+      user: req.user.userId,
+    });
+
+    if (!resume) {
+      return res.status(404).json({ message: "Resume not found" });
+    }
+
+    if (!resume.skills || skillIndex >= resume.skills.length) {
+      return res.status(404).json({ message: "Skill not found" });
+    }
+
+    // Store current state in history before updating
+    resume.parseHistory.push({
+      skills: [...resume.skills],
+      experience: resume.experience,
+      projects: resume.projects,
+      parseMethod: "user_deletion",
+      parsedAt: new Date(),
+    });
+
+    // Remove the skill at the specified index
+    resume.skills.splice(skillIndex, 1);
+    resume.currentVersion += 1;
+    resume.lastModifiedBy = "user";
+
+    await resume.save();
+
+    // Generate fresh authenticated URL
+    const authenticatedUrl = generatePdfUrl(resume.cloudinaryPublicId);
+
+    res.json({
+      id: resume._id,
+      ...resume.toObject(),
+      url: authenticatedUrl,
+      message: "Skill removed successfully",
+    });
+  } catch (error) {
+    console.error("Error removing skill:", error);
+    res.status(500).json({
+      message: "Error removing skill",
       error: error.message,
     });
   }

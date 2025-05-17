@@ -28,16 +28,22 @@ axios.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     const isLoginPage = window.location.pathname === "/login";
+    const isLandingPage = window.location.pathname === "/";
+    const isSignupPage = window.location.pathname === "/signup";
     const isRefreshRequest = originalRequest.url === "/auth/refresh-token";
 
     // Don't retry if:
     // 1. It's already a refresh token request
     // 2. We're on the login page
     // 3. The request has already been retried
+    // 4. We're on the Signup page
+    // 5. We're on the Landing page
     if (
       error.response?.status === 401 &&
       !isRefreshRequest &&
+      !isLandingPage &&
       !isLoginPage &&
+      !isSignupPage &&
       !originalRequest._retry
     ) {
       originalRequest._retry = true;
@@ -60,8 +66,8 @@ axios.interceptors.response.use(
         delete axios.defaults.headers.common["Authorization"];
 
         // Only redirect if we're not already on the login page
-        if (!isLoginPage) {
-          window.location.href = "/login";
+        if (!isLandingPage) {
+          window.location.href = "/";
         }
         return Promise.reject(refreshError);
       }
