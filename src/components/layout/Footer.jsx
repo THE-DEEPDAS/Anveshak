@@ -44,7 +44,7 @@ const Footer = () => {
         </div>
         
         <div className="border-t border-gray-700 mt-6 pt-6 text-center text-xs text-gray-500">
-          <p>&copy; {new Date().getFullYear()} Anveshak. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Anveshak. All rights reserved with Deep Das.</p>
           <p className="mt-1">Built with React, Node.js, MongoDB, and Gemini AI.</p>
         </div>
       </div>

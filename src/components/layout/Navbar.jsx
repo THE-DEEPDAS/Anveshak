@@ -109,18 +109,25 @@ const Navbar = () => {
             <div className="px-4 py-2 border-b border-gray-200">
               <p className="text-sm font-medium text-gray-900">{user.name}</p>
               <p className="text-xs text-gray-600">{user.email}</p>
-            </div>
-
+            </div>{" "}
             {resume && (
-              <Link
-                to="/dashboard"
-                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                onClick={() => setShowProfileMenu(false)}
-              >
-                Dashboard
-              </Link>
+              <>
+                <Link
+                  to="/dashboard"
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  onClick={() => setShowProfileMenu(false)}
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  to="/academic-emails"
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  onClick={() => setShowProfileMenu(false)}
+                >
+                  Academic Emails
+                </Link>
+              </>
             )}
-
             <button
               onClick={() => {
                 setShowProfileMenu(false);
@@ -157,19 +164,33 @@ const Navbar = () => {
                 : "text-gray-600 hover:text-blue-600 transition-colors"
             }`}
           >
+            {" "}
             Home
           </Link>
           {resume && (
-            <Link
-              to="/dashboard"
-              className={`text-sm font-medium ${
-                location.pathname === "/dashboard"
-                  ? "text-blue-600"
-                  : "text-gray-600 hover:text-blue-600 transition-colors"
-              }`}
-            >
-              Dashboard
-            </Link>
+            <>
+              <Link
+                to="/dashboard"
+                className={`text-sm font-medium ${
+                  location.pathname === "/dashboard"
+                    ? "text-blue-600"
+                    : "text-gray-600 hover:text-blue-600 transition-colors"
+                }`}
+              >
+                {" "}
+                Dashboard
+              </Link>
+              <Link
+                to="/academic-emails"
+                className={`text-sm font-medium ${
+                  location.pathname === "/academic-emails"
+                    ? "text-blue-600"
+                    : "text-gray-600 hover:text-blue-600 transition-colors"
+                }`}
+              >
+                Academic Emails
+              </Link>
+            </>
           )}
           {renderAuthLinks()}
           {renderProfileMenu()}

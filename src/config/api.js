@@ -82,6 +82,7 @@ export const API_ENDPOINTS = {
   users: "/users",
   resumes: "/resumes",
   emails: "/emails",
+  academic: "/academic",
 };
 
 export default axios;

@@ -465,6 +465,80 @@ export const generateEmailContent = async ({
   }
 };
 
+// Generate a personalized email for a research internship application
+export const generateBetterEmailWithLLM = async ({
+  facultyName,
+  facultyResearch,
+  facultyPublications,
+  facultyProjects,
+  userSkills,
+  userExperience,
+  userProjects,
+}) => {
+  try {
+    const model = getModel();
+    if (!model) {
+      throw new Error("AI model not initialized");
+    }
+
+    const prompt = `Generate a personalized email for a research internship application.
+
+Context:
+- Professor: ${facultyName}
+- Research Areas: ${facultyResearch.join(", ")}
+- Recent Publications: ${facultyPublications.join(", ")}
+- Current Projects: ${facultyProjects.join(", ")}
+
+Student Profile:
+- Skills: ${userSkills.join(", ")}
+- Experience: ${userExperience.join(", ")}
+- Projects: ${userProjects.join(", ")}
+
+Requirements:
+1. Create a compelling subject line
+2. Write a formal but engaging email body
+3. Highlight relevant skills and projects that align with the professor's research
+4. Mention specific publications or projects that interest you
+5. Keep it concise (250-300 words)
+6. Be respectful and professional
+7. End with a clear call to action
+
+Format the response as a JSON object with 'subject' and 'body' fields.`;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+
+    try {
+      // Extract JSON from the response
+      const match = text.match(/\{[\s\S]*\}/);
+      if (match) {
+        const jsonStr = match[0];
+        const parsed = JSON.parse(jsonStr);
+        return {
+          subject: parsed.subject,
+          body: parsed.body,
+        };
+      }
+    } catch (error) {
+      console.error("Error parsing AI response:", error);
+    }
+
+    // Fallback if JSON parsing fails: try to extract subject and body using regex
+    const subjectMatch = text.match(/subject["\s:]+([^\n"]+)/i);
+    const bodyMatch = text.match(/body["\s:]+([^}]+)/i);
+
+    return {
+      subject: subjectMatch
+        ? subjectMatch[1].trim()
+        : "Research Internship Application",
+      body: bodyMatch ? bodyMatch[1].trim() : text,
+    };
+  } catch (error) {
+    console.error("Error generating email with LLM:", error);
+    throw error;
+  }
+};
+
 // Mock data functions for development
 const getMockSkills = () => {
   return [

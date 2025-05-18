@@ -9,12 +9,15 @@ import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import compression from "compression";
 import { config } from "./config/config.js";
+import Faculty from "./models/Faculty.js";
+import Institution from "./models/Institution.js";
 
 // Routes
 import resumeRoutes from "./routes/resumeRoutes.js";
 import emailRoutes from "./routes/emailRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import academicRoutes from "./routes/academicRoutes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -114,12 +117,30 @@ app.use("/api/auth", authRoutes);
 app.use("/api/resumes", resumeRoutes);
 app.use("/api/emails", emailRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/academic", academicRoutes);
 
 // Database connection
 mongoose
   .connect(config.mongodb.uri)
-  .then(() => {
+  .then(async () => {
     console.log("Connected to MongoDB");
+
+    // Check if we need to initialize the academic database
+    const facultyCount = await Faculty.countDocuments();
+    const institutionCount = await Institution.countDocuments();
+
+    if (facultyCount === 0 || institutionCount === 0) {
+      console.log("Initializing academic database...");
+      try {
+        const { default: initAcademicDb } = await import(
+          "./scripts/initAcademicDb.js"
+        );
+        await initAcademicDb();
+        console.log("Academic database initialized successfully");
+      } catch (error) {
+        console.error("Error initializing academic database:", error);
+      }
+    }
   })
   .catch((error) => {
     console.error("MongoDB connection error:", error);

@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "description": "Backend for the Cold Mailer application",
   "main": "index.js",
-  "type": "module",
-  "scripts": {
+  "type": "module",  "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "init-db": "node scripts/initAcademicDb.js",
+    "init-academic-db": "node scripts/initAcademicDb.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.2.0",

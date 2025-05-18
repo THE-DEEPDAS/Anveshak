@@ -14,6 +14,7 @@ import { AppProvider } from "./context/AppContext";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
+import AcademicEmailsPage from "./pages/AcademicEmailsPage";
 
 // Enable React Router v7 future flags
 const router = {
@@ -59,12 +60,20 @@ function App() {
                       <EmailsPage />
                     </ProtectedRoute>
                   }
-                />
+                />{" "}
                 <Route
                   path="/emails/:emailId"
                   element={
                     <ProtectedRoute>
                       <EmailDetailPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/academic-emails"
+                  element={
+                    <ProtectedRoute>
+                      <AcademicEmailsPage />
                     </ProtectedRoute>
                   }
                 />
