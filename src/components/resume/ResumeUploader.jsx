@@ -193,6 +193,7 @@ const ResumeUploader = () => {
         skills: response.resume.skills || [],
         experience: response.resume.experience || [],
         projects: response.resume.projects || [],
+        education: response.resume.education || [],
         warning: response.resume.warning || null,
         parseMethod: response.resume.parseMethod,
         foundExactSections: response.resume.foundExactSections,

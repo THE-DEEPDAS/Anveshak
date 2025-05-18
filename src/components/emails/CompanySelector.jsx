@@ -19,6 +19,18 @@ const CompanySelector = ({ companies, onCompaniesSelected }) => {
     }
   };
 
+  const formatTechStack = (techStack) => {
+    if (!techStack) return "";
+    if (typeof techStack === "string") return techStack;
+    if (typeof techStack === "object") {
+      const stack = [];
+      if (techStack.software) stack.push(...techStack.software);
+      if (techStack.hardware) stack.push(...techStack.hardware);
+      return stack.join(", ");
+    }
+    return "";
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <h2 className="text-2xl font-bold text-gray-800 mb-6">
@@ -88,7 +100,7 @@ const CompanySelector = ({ companies, onCompaniesSelected }) => {
                       Tech Stack:{" "}
                     </span>
                     <span className="text-gray-600">
-                      {company.research.techStack}
+                      {formatTechStack(company.research.techStack)}
                     </span>
                   </div>
                 </>

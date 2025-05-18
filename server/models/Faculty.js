@@ -10,6 +10,7 @@ const facultySchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
+    unique: true,
   },
   institution: {
     type: mongoose.Schema.Types.ObjectId,

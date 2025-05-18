@@ -12,6 +12,8 @@ import {
   searchAcademicFaculty,
   generatePreviewEmails,
 } from "../../services/academicEmailService";
+import axios from "axios";
+import { API_ENDPOINTS } from "../../config/api";
 import { useToast } from "../ui/Toaster";
 import EmailPreview from "./EmailPreview";
 
@@ -22,15 +24,15 @@ const AcademicEmailGenerator = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [faculty, setFaculty] = useState([]);
   const [selectedFaculty, setSelectedFaculty] = useState([]);
+  const [selectedFacultyIds, setSelectedFacultyIds] = useState(new Set());
   const [step, setStep] = useState(1);
   const [showPreview, setShowPreview] = useState(false);
   const [previewEmails, setPreviewEmails] = useState([]);
-
   const handlePreviewEmails = async () => {
     if (!resume?.id) {
       showToast("Please upload a resume first", "error");
       return;
-    }
+    } // Education is optional
 
     if (selectedFaculty.length === 0) {
       showToast("Please select at least one faculty member", "error");
@@ -93,36 +95,39 @@ const AcademicEmailGenerator = () => {
       setIsLoading(false);
     }
   };
-
   const handleSendEmails = async (email) => {
     try {
-      const response = await fetch("/api/academic/send-faculty-email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({
+      const response = await axios.post(
+        `${API_ENDPOINTS.academic}/generate-preview-emails`,
+        {
           resumeId: resume.id,
-          faculty: {
-            _id: email.facultyId,
-            email: email.recipient,
-          },
-          content: email.content,
-          subject: email.subject,
-        }),
-      });
+          selectedFaculty: [
+            {
+              _id: email.facultyId,
+              email: email.recipient,
+              name: selectedFaculty.find((f) => f._id === email.facultyId)
+                ?.name,
+              department: selectedFaculty.find((f) => f._id === email.facultyId)
+                ?.department,
+              institution: selectedFaculty.find(
+                (f) => f._id === email.facultyId
+              )?.institution,
+              researchInterests: selectedFaculty.find(
+                (f) => f._id === email.facultyId
+              )?.researchInterests,
+            },
+          ],
+        }
+      );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to send email");
+      if (!response.data?.emails) {
+        throw new Error("Failed to generate email preview");
       }
 
-      return data;
+      return response.data.emails[0];
     } catch (error) {
       console.error("Error sending email:", error);
-      throw error;
+      throw new Error(error.response?.data?.message || "Failed to send email");
     }
   };
 
@@ -171,12 +176,92 @@ const AcademicEmailGenerator = () => {
   };
 
   const toggleFacultySelection = (facultyMember) => {
+    if (!facultyMember.email) {
+      showToast("Faculty member must have an email address", "error");
+      return;
+    }
     setSelectedFaculty((prev) => {
-      if (prev.some((f) => f._id === facultyMember._id)) {
+      const isSelected = prev.some((f) => f._id === facultyMember._id);
+      if (isSelected) {
         return prev.filter((f) => f._id !== facultyMember._id);
       }
       return [...prev, facultyMember];
     });
+  };
+  const handleFacultySelect = (facultyId) => {
+    const selectedFacultyMember = faculty.find((f) => f._id === facultyId);
+    if (!selectedFacultyMember) return;
+
+    if (!selectedFacultyMember.email) {
+      showToast("Faculty member must have an email address", "error");
+      return;
+    }
+
+    setSelectedFacultyIds((prev) => {
+      const newSelection = new Set(prev);
+      if (newSelection.has(facultyId)) {
+        newSelection.delete(facultyId);
+      } else {
+        // Only allow one selection at a time
+        newSelection.clear();
+        newSelection.add(facultyId);
+      }
+      return newSelection;
+    });
+
+    // Update selectedFaculty to match selectedFacultyIds
+    setSelectedFaculty((prev) => {
+      if (prev.some((f) => f._id === facultyId)) {
+        return prev.filter((f) => f._id !== facultyId);
+      }
+      return [selectedFacultyMember];
+    });
+  };
+
+  const renderFacultyList = () => {
+    return faculty.map((faculty) => (
+      <div
+        key={faculty._id}
+        className={`p-4 border rounded-lg mb-4 cursor-pointer ${
+          selectedFacultyIds.has(faculty._id)
+            ? "border-blue-500 bg-blue-50"
+            : "border-gray-200 hover:border-blue-300"
+        }`}
+        onClick={() => handleFacultySelect(faculty._id)}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold">{faculty.name}</h3>
+            <p className="text-sm text-gray-600">{faculty.department}</p>
+            <p className="text-sm text-gray-500">{faculty.institution?.name}</p>
+          </div>
+          <input
+            type="checkbox"
+            checked={selectedFacultyIds.has(faculty._id)}
+            onChange={() => handleFacultySelect(faculty._id)}
+            className="h-5 w-5 text-blue-600"
+          />
+        </div>
+        <div className="mt-2">
+          <p className="text-sm font-medium">Research Interests:</p>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {faculty.researchInterests.map((interest, index) => (
+              <span
+                key={index}
+                className="px-2 py-1 bg-gray-100 rounded-full text-xs"
+              >
+                {interest}
+              </span>
+            ))}
+          </div>
+        </div>
+        {faculty.relevanceScore && (
+          <div className="mt-2 text-sm text-gray-600">
+            Match Score: {Math.round(faculty.relevanceScore)}%
+          </div>
+        )}
+      </div>
+    ));
   };
 
   const handleGenerateEmails = () => {
@@ -233,57 +318,7 @@ const AcademicEmailGenerator = () => {
               <h2 className="text-xl font-semibold mb-4">
                 Select Faculty Members
               </h2>
-              <div className="space-y-4">
-                {faculty.map((f) => (
-                  <div
-                    key={f._id}
-                    className={`p-4 rounded-lg border transition-all cursor-pointer ${
-                      selectedFaculty.some((sf) => sf._id === f._id)
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-200 hover:border-blue-300"
-                    }`}
-                    onClick={() => toggleFacultySelection(f)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-semibold text-gray-800">
-                          {" "}
-                          {f.name}
-                        </h3>
-                        <p className="text-gray-600 text-sm">{f.department}</p>
-                        <p className="text-gray-600 text-sm">
-                          {f.institution?.name || "Unknown Institution"}
-                        </p>
-                        <div className="mt-2">
-                          <h4 className="text-sm font-medium text-gray-700">
-                            Research Interests:
-                          </h4>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            {" "}
-                            {f.researchInterests?.map((interest, index) => (
-                              <span
-                                key={index}
-                                className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full"
-                              >
-                                {interest || "Unknown"}
-                              </span>
-                            )) || (
-                              <span className="text-xs text-gray-500">
-                                No research interests listed
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex h-6 w-6 items-center justify-center">
-                        {selectedFaculty.some((sf) => sf._id === f._id) && (
-                          <FaCheck className="text-blue-500" />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <div className="space-y-4">{renderFacultyList()}</div>
             </div>{" "}
             {/* Action Buttons */}
             <div className="flex justify-end space-x-4">

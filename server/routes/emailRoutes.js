@@ -1,12 +1,24 @@
 import express from "express";
 import Email from "../models/Email.js";
 import Resume from "../models/Resume.js";
+import Faculty from "../models/Faculty.js";
+import Company from "../models/Company.js";
 import {
   generateEmailContent,
   findCompaniesForSkills,
   researchCompany,
 } from "../services/aiService.js";
+import {
+  searchCompanies,
+  generateCompanyEmail,
+} from "../services/companyEmailService.js";
+import { generateAcademicEmail } from "../services/academicEmailService.js";
 import { sendEmail } from "../services/emailService.js";
+
+// Helper function to escape special regex characters
+const escapeRegExp = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+};
 
 const router = express.Router();
 
@@ -33,15 +45,44 @@ router.post("/generate", async (req, res) => {
           "Resume must have either skills or experience to generate emails",
       });
     }
-
     switch (action) {
       case "find-companies":
-        // Find matching companies based on skills and/or experience
-        const matchingCompanies = await findCompaniesForSkills(
-          resume.skills || [],
-          resume.experience || [],
-          resume.projects || []
-        );
+        // First try finding companies from our database
+        let matchingCompanies = await Company.find({
+          $or: [
+            { roles: { $in: [req.body.role || "Software Engineer"] } },
+            {
+              "research.techStack": {
+                $in: resume.skills.map(
+                  (skill) => new RegExp(escapeRegExp(skill), "i")
+                ),
+              },
+            },
+          ],
+        })
+          .sort({ lastUpdated: -1 })
+          .limit(5);
+
+        // If not enough results, use LLM to find more
+        if (matchingCompanies.length < 5) {
+          const newCompanies = await searchCompanies(
+            resume.skills || [],
+            req.body.role || "Software Engineer"
+          );
+
+          // Merge results, prioritizing DB results
+          const existingNames = new Set(
+            matchingCompanies.map((c) => c.name.toLowerCase())
+          );
+          const uniqueNewCompanies = newCompanies.filter(
+            (c) => !existingNames.has(c.name.toLowerCase())
+          );
+
+          matchingCompanies = [
+            ...matchingCompanies,
+            ...uniqueNewCompanies,
+          ].slice(0, 10);
+        }
 
         if (!matchingCompanies?.length) {
           return res.status(404).json({
@@ -49,8 +90,26 @@ router.post("/generate", async (req, res) => {
           });
         }
 
-        return res.status(200).json({ companies: matchingCompanies });
+        // Enrich results with researched data
+        const enrichedCompanies = await Promise.all(
+          matchingCompanies.map(async (company) => {
+            try {
+              const research = await researchCompany(company.name);
+              return {
+                ...company,
+                research: research || {},
+              };
+            } catch (error) {
+              console.error(
+                `Error researching company ${company.name}:`,
+                error
+              );
+              return company;
+            }
+          })
+        );
 
+        return res.status(200).json({ companies: enrichedCompanies });
       case "generate-emails":
         if (!Array.isArray(companies) || companies.length === 0) {
           return res
@@ -64,16 +123,37 @@ router.post("/generate", async (req, res) => {
             throw new Error("Invalid company data");
           }
 
-          // Generate email content with company research
+          // Ensure we have research data for the company
+          let companyWithResearch = company;
+          if (!company.research) {
+            const research = await researchCompany(company.name);
+            companyWithResearch = { ...company, research };
+          }
+
+          // Save or update company in database
+          await Company.findOneAndUpdate(
+            { name: company.name },
+            {
+              name: company.name,
+              email: company.email,
+              roles: [company.role],
+              research: companyWithResearch.research,
+              lastResearched: new Date(),
+              lastUpdated: new Date(),
+            },
+            { upsert: true }
+          );
+
+          // Generate personalized email using enhanced company context
           const emailContent = await generateEmailContent({
             userName: resume.user.name,
             userEmail: resume.user.email,
-            company: company.name,
-            skills: resume.skills,
-            experience: resume.experience,
-            projects: resume.projects,
-            role: company.role,
-            companyResearch: company.research,
+            company: companyWithResearch.name,
+            role: companyWithResearch.role,
+            skills: resume.skills || [],
+            experience: resume.experience || [],
+            projects: resume.projects || [],
+            companyResearch: companyWithResearch.research,
           });
 
           // Create new email document
@@ -184,6 +264,150 @@ router.post("/generate", async (req, res) => {
   }
 });
 
+// Generate preview emails
+router.post("/generate-preview-emails", async (req, res) => {
+  try {
+    const { resumeId, selectedCompanies } = req.body;
+
+    if (
+      !resumeId ||
+      !Array.isArray(selectedCompanies) ||
+      selectedCompanies.length === 0
+    ) {
+      return res.status(400).json({ message: "Invalid input parameters" });
+    }
+
+    // Find resume with user data
+    const resume = await Resume.findById(resumeId).populate("user");
+    if (!resume) {
+      return res.status(404).json({ message: "Resume not found" });
+    } // Generate preview emails for each company
+    const previewEmails = await Promise.all(
+      selectedCompanies.map(async (company) => {
+        try {
+          // Ensure we have research data
+          let companyWithResearch = company;
+          if (!company.research) {
+            const research = await researchCompany(company.name);
+            companyWithResearch = { ...company, research };
+          }
+
+          // Ensure we have all necessary resume data
+          if (!resume.user?.name || !resume.user?.email) {
+            throw new Error("Resume user data is incomplete");
+          }
+
+          // Generate email with complete context
+          const emailContent = await generateEmailContent({
+            userName: resume.user.name,
+            userEmail: resume.user.email,
+            company: companyWithResearch.name,
+            role: companyWithResearch.role,
+            skills: resume.skills || [],
+            experience: resume.experience || [],
+            projects: resume.projects || [],
+            companyResearch: companyWithResearch.research,
+          });
+
+          return {
+            company: company.name,
+            recipient: company.email,
+            role: company.role,
+            subject: emailContent.subject,
+            body: emailContent.body,
+            status: "draft",
+            companyResearch: companyWithResearch.research,
+            matchReason: company.matchReason,
+          };
+        } catch (error) {
+          console.error(`Error generating preview for ${company.name}:`, error);
+          return null;
+        }
+      })
+    );
+
+    // Filter out any failed generations
+    const validEmails = previewEmails.filter((email) => email !== null);
+
+    if (validEmails.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "Failed to generate preview emails" });
+    }
+
+    return res.status(200).json({ emails: validEmails });
+  } catch (error) {
+    console.error("Error generating preview emails:", error);
+    return res.status(500).json({
+      message: "Server error generating preview emails",
+      error: error.message,
+    });
+  }
+});
+
+// Generate preview emails for academic faculty
+router.post("/academic/generate-preview-emails", async (req, res) => {
+  try {
+    const { resumeId, facultyIds } = req.body;
+
+    // Validate inputs
+    if (!resumeId || !Array.isArray(facultyIds) || facultyIds.length === 0) {
+      return res.status(400).json({
+        message: "Valid Resume ID and faculty IDs array are required",
+      });
+    }
+
+    // Find resume with user data
+    const resume = await Resume.findById(resumeId).populate("user");
+    if (!resume) {
+      return res.status(404).json({ message: "Resume not found" });
+    }
+
+    // Find selected faculty members
+    const faculty = await Faculty.find({
+      _id: { $in: facultyIds },
+    }).populate("institution");
+
+    if (faculty.length === 0) {
+      return res.status(404).json({ message: "No faculty members found" });
+    }
+
+    // Generate preview emails for each faculty member
+    const previewEmails = await Promise.all(
+      faculty.map(async (facultyMember) => {
+        try {
+          const emailContent = await generateAcademicEmail(
+            facultyMember,
+            resume
+          );
+          return {
+            facultyId: facultyMember._id,
+            facultyName: facultyMember.name,
+            institution: facultyMember.institution.name,
+            subject: emailContent.subject,
+            body: emailContent.body,
+          };
+        } catch (error) {
+          console.error(
+            `Error generating email for faculty ${facultyMember.name}:`,
+            error
+          );
+          return {
+            facultyId: facultyMember._id,
+            facultyName: facultyMember.name,
+            error: "Failed to generate email",
+          };
+        }
+      })
+    );
+
+    return res.status(200).json({ emails: previewEmails });
+  } catch (error) {
+    console.error("Error generating preview emails:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 // Get emails by resume ID
 router.get("/resume/:resumeId", async (req, res) => {
   try {
@@ -222,6 +446,40 @@ router.get("/:id", async (req, res) => {
     res.status(200).json(email);
   } catch (error) {
     console.error("Error fetching email:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// Edit email content
+router.put("/:id/edit", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { subject, body } = req.body;
+
+    if (!subject || !body) {
+      return res.status(400).json({ message: "Subject and body are required" });
+    }
+
+    const email = await Email.findById(id);
+    if (!email) {
+      return res.status(404).json({ message: "Email not found" });
+    }
+
+    // Only allow editing of draft emails
+    if (email.status !== "draft") {
+      return res
+        .status(400)
+        .json({ message: "Only draft emails can be edited" });
+    }
+
+    email.subject = subject;
+    email.body = body;
+    email.lastModified = new Date();
+
+    const updatedEmail = await email.save();
+    res.status(200).json(updatedEmail);
+  } catch (error) {
+    console.error("Error updating email:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });

@@ -4,6 +4,16 @@ const parseResultSchema = new mongoose.Schema({
   skills: [{ type: String, trim: true }],
   experience: [{ type: String, trim: true }],
   projects: [{ type: String, trim: true }],
+  education: [
+    {
+      institution: { type: String, trim: true },
+      degree: { type: String, trim: true },
+      field: { type: String, trim: true },
+      startDate: { type: String },
+      endDate: { type: String },
+      gpa: { type: String },
+    },
+  ],
   parseMethod: { type: String }, // Track which parsing method was used
   warning: { type: String }, // Store any warnings at the history level
   parsedAt: { type: Date, default: Date.now },
@@ -16,6 +26,20 @@ const resumeSchema = new mongoose.Schema(
       ref: "User",
       required: true,
       index: true,
+    },
+    education: {
+      type: [
+        {
+          name: { type: String, trim: true },
+          institution: { type: String, trim: true },
+          degree: { type: String, trim: true },
+          field: { type: String, trim: true },
+          startDate: { type: String },
+          endDate: { type: String },
+          gpa: { type: String },
+        },
+      ],
+      default: [], // Make education optional with empty array default
     },
     filename: {
       type: String,
@@ -102,10 +126,11 @@ resumeSchema.index({ cloudinaryPublicId: 1 }, { unique: true });
 resumeSchema.methods.updateParseResults = function (parseResults) {
   this.text = parseResults.text; // Store raw text
 
-  // Replace (not append) skills, experience, and projects with new values
+  // Replace (not append) skills, experience, projects and education with new values
   this.skills = parseResults.skills || [];
   this.experience = parseResults.experience || [];
   this.projects = parseResults.projects || [];
+  this.education = parseResults.education || [];
 
   this.warning = parseResults.warning; // Store any warnings
   this.parseMethod = parseResults.parseMethod || "regular";
@@ -167,6 +192,7 @@ resumeSchema.methods.updateManually = function (userData) {
   if (userData.skills !== undefined) this.skills = userData.skills;
   if (userData.experience !== undefined) this.experience = userData.experience;
   if (userData.projects !== undefined) this.projects = userData.projects;
+  if (userData.education !== undefined) this.education = userData.education;
 
   // Clear warnings and errors since user has manually fixed
   this.warning = null;

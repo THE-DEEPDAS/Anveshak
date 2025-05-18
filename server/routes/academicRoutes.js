@@ -26,37 +26,161 @@ router.post("/generate-preview-emails", async (req, res) => {
       return res.status(400).json({
         message: "Resume ID and selected faculty array are required",
       });
-    }
-
-    // Get resume data
+    } // Get resume data
     const resume = await Resume.findById(resumeId);
     if (!resume) {
       return res.status(404).json({ message: "Resume not found" });
-    }
+    } // Education is optional
+
+    // Validate and normalize all faculty data
+    const invalidFaculty = [];
+    const normalizedFaculty = selectedFaculty
+      .map((faculty) => {
+        if (!faculty.email || typeof faculty.email !== "string") {
+          invalidFaculty.push(faculty);
+          return null;
+        }
+
+        // Create a validated faculty object with defaults for missing fields
+        return {
+          ...faculty,
+          name: faculty.name || faculty.fullName || "Professor",
+          department: faculty.department || "Research",
+          researchInterests:
+            Array.isArray(faculty.researchInterests) ||
+            faculty.researchInterests instanceof Set
+              ? faculty.researchInterests
+              : [],
+          institution: faculty.institution || { name: "Unknown Institution" },
+          email: faculty.email.trim(),
+          title: faculty.title || "Professor",
+          publications:
+            Array.isArray(faculty.publications) ||
+            faculty.publications instanceof Set
+              ? faculty.publications
+              : [],
+        };
+      })
+      .filter((f) => f !== null);
+
+    if (invalidFaculty.length > 0) {
+      return res.status(400).json({
+        message: "Some faculty members have invalid or missing email addresses",
+        invalidFaculty: invalidFaculty.map((f) => f.name || "Unknown"),
+      });
+    } // Find matching skills and experience
+    const relevantSkills = resume.skills || [];
+    const relevantExperience = resume.experience || [];
+    const relevantProjects = resume.projects || [];
 
     // Generate emails for each faculty member
     const emails = [];
-    for (const faculty of selectedFaculty) {
+    const errors = [];
+    for (const faculty of normalizedFaculty) {
       try {
-        const emailContent = await generateBetterEmail(faculty, resume);
+        // Find matches between faculty interests and candidate background
+        const matchingSkills = relevantSkills.filter((skill) =>
+          faculty.researchInterests?.some(
+            (interest) =>
+              interest.toLowerCase().includes(skill.toLowerCase()) ||
+              skill.toLowerCase().includes(interest.toLowerCase())
+          )
+        );
+
+        const matchingExperience = relevantExperience.filter((exp) =>
+          faculty.researchInterests?.some(
+            (interest) =>
+              exp.description?.toLowerCase().includes(interest.toLowerCase()) ||
+              matchingSkills.some((skill) =>
+                exp.description?.toLowerCase().includes(skill.toLowerCase())
+              )
+          )
+        );
+
+        const matchingProjects = relevantProjects.filter((proj) =>
+          faculty.researchInterests?.some(
+            (interest) =>
+              proj.description
+                ?.toLowerCase()
+                .includes(interest.toLowerCase()) ||
+              matchingSkills.some((skill) =>
+                proj.description?.toLowerCase().includes(skill.toLowerCase())
+              )
+          )
+        ); // Ensure we have complete faculty data
+        const validatedFaculty = {
+          ...faculty,
+          name: faculty.name,
+          department: faculty.department || "Research",
+          researchInterests: faculty.researchInterests || [],
+          institution: faculty.institution || { name: "Unknown Institution" },
+        };
+
+        // Basic validation
+        if (
+          !validatedFaculty.name ||
+          !Array.isArray(validatedFaculty.researchInterests)
+        ) {
+          console.warn(
+            `Invalid faculty data for ${
+              validatedFaculty.name || "unknown faculty"
+            }:`,
+            faculty
+          );
+          throw new Error(
+            `Invalid faculty profile for ${
+              validatedFaculty.name || "unknown faculty"
+            }`
+          );
+        }
+
+        const emailContent = await generateBetterEmail(
+          validatedFaculty,
+          resume
+        );
+
+        if (!emailContent || !emailContent.subject || !emailContent.body) {
+          throw new Error("Generated email content is incomplete");
+        }
+
         emails.push({
-          faculty,
+          preview: true,
           subject: emailContent.subject,
           content: emailContent.body,
+          faculty: {
+            id: faculty._id,
+            name: faculty.name,
+            email: faculty.email,
+            department: faculty.department,
+            institution: faculty.institution?.name || "Unknown Institution",
+            researchInterests: faculty.researchInterests || [],
+          },
         });
       } catch (error) {
         console.error(`Error generating email for ${faculty.name}:`, error);
-        // Continue with other faculty members even if one fails
+        errors.push({
+          facultyName: faculty.name,
+          error: error.message,
+        });
       }
     }
 
     if (emails.length === 0) {
       return res.status(500).json({
         message: "Failed to generate any email previews",
+        errors,
       });
     }
 
-    res.json({ emails });
+    res.status(200).json({
+      emails,
+      ...(errors.length > 0 && { errors }),
+      summary: {
+        total: selectedFaculty.length,
+        generated: emails.length,
+        failed: errors.length,
+      },
+    });
   } catch (error) {
     console.error("Error generating email previews:", error);
     res.status(500).json({
@@ -300,56 +424,63 @@ router.post("/extra-findings", async (req, res) => {
 });
 
 /**
- * Generate email previews for selected faculty
+ * Regenerate email for a specific faculty member
  */
-router.post("/generate-preview-emails", async (req, res) => {
+router.post("/regenerate-email", async (req, res) => {
   try {
-    const { resumeId, selectedFaculty } = req.body;
+    const { resumeId, facultyId } = req.body;
 
-    if (
-      !resumeId ||
-      !Array.isArray(selectedFaculty) ||
-      selectedFaculty.length === 0
-    ) {
+    if (!resumeId || !facultyId) {
       return res.status(400).json({
-        message: "Resume ID and selected faculty array are required",
+        message: "Resume ID and faculty ID are required",
       });
     }
 
-    // Get resume data
-    const resume = await Resume.findById(resumeId);
+    // Get resume and faculty data
+    const [resume, faculty] = await Promise.all([
+      Resume.findById(resumeId),
+      Faculty.findById(facultyId).populate("institution"),
+    ]);
+
     if (!resume) {
       return res.status(404).json({ message: "Resume not found" });
     }
-
-    // Generate emails for each faculty member
-    const emails = [];
-    for (const faculty of selectedFaculty) {
-      try {
-        const emailContent = await generateBetterEmail(faculty, resume);
-        emails.push({
-          faculty,
-          subject: emailContent.subject,
-          content: emailContent.body,
-        });
-      } catch (error) {
-        console.error(`Error generating email for ${faculty.name}:`, error);
-        // Continue with other faculty members even if one fails
-      }
-    }
-
-    if (emails.length === 0) {
-      return res.status(500).json({
-        message: "Failed to generate any email previews",
+    if (!faculty) {
+      return res.status(404).json({ message: "Faculty not found" });
+    } // Validate email existence
+    if (!faculty.email) {
+      return res.status(400).json({
+        message: "Faculty member must have an email address",
       });
     }
 
-    res.json({ emails });
+    // Generate new email content with improved email generator
+    const emailContent = await generateBetterEmail(faculty, resume);
+
+    if (!emailContent || !emailContent.subject || !emailContent.body) {
+      throw new Error("Generated email content is incomplete");
+    }
+
+    // Create a preview email document without saving
+    const previewEmail = {
+      subject: emailContent.subject,
+      content: emailContent.body,
+      faculty: {
+        id: faculty._id,
+        name: faculty.name,
+        email: faculty.email,
+        department: faculty.department,
+        institution: faculty.institution?.name || "Unknown Institution",
+        researchInterests: faculty.researchInterests || [],
+      },
+      preview: true,
+    };
+
+    res.status(200).json(previewEmail);
   } catch (error) {
-    console.error("Error generating email previews:", error);
+    console.error("Error regenerating email:", error);
     res.status(500).json({
-      message: "Error generating email previews",
-      error: error.message,
+      message: error.message || "Failed to regenerate email",
     });
   }
 });

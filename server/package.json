@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "Backend for the Cold Mailer application",
   "main": "index.js",
-  "type": "module",  "scripts": {
+  "type": "module",
+  "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
     "init-db": "node scripts/initAcademicDb.js",
@@ -13,6 +14,7 @@
     "@google/generative-ai": "^0.2.0",
     "axios": "^1.9.0",
     "bcryptjs": "^2.4.3",
+    "cheerio": "^1.0.0",
     "cloudinary": "^1.41.0",
     "compression": "^1.8.0",
     "cookie-parser": "^1.4.6",

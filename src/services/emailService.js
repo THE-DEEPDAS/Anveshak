@@ -21,18 +21,6 @@ export const generateEmails = async (resumeId, options = {}) => {
   }
 };
 
-export const sendEmails = async (emailIds) => {
-  try {
-    const response = await axios.post(`${API_ENDPOINTS.emails}/send`, {
-      emailIds,
-    });
-    return response.data;
-  } catch (error) {
-    console.error("Error sending emails:", error);
-    throw error;
-  }
-};
-
 export const getEmailsByResumeId = async (resumeId) => {
   try {
     const response = await axios.get(
@@ -51,16 +39,6 @@ export const getEmailById = async (emailId) => {
     return response.data;
   } catch (error) {
     console.error("Error fetching email:", error);
-    throw error;
-  }
-};
-
-export const getUserEmails = async (userId) => {
-  try {
-    const response = await axios.get(`${API_ENDPOINTS.emails}/user/${userId}`);
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching user emails:", error);
     throw error;
   }
 };
@@ -128,7 +106,7 @@ Test User`,
   ];
 };
 
-import api from "./api";
+import api from "../config/api";
 
 /**
  * Find academic institutions and faculty members matching the user's profile
@@ -258,3 +236,29 @@ export const sendEmails = async (emailIds) => {
     );
   }
 };
+
+/**
+ * Edit an existing email draft
+ * @param {string} emailId - ID of the email to edit
+ * @param {Object} updates - Object containing subject and body updates
+ * @returns {Promise<Object>} - Updated email object
+ */
+export const editEmail = async (emailId, { subject, body }) => {
+  try {
+    const response = await axios.put(
+      `${API_ENDPOINTS.emails}/${emailId}/edit`,
+      {
+        subject,
+        body,
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error editing email:", error);
+    throw (
+      error.response?.data?.message || error.message || "Failed to edit email"
+    );
+  }
+};
+
+export default router;

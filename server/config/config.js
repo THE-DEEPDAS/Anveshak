@@ -102,6 +102,30 @@ const corsConfig = {
   exposedHeaders: ["set-cookie"],
 };
 
+// Helper to parse MongoDB URI and add options
+const getMongoDBUri = () => {
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    console.error("MONGODB_URI environment variable is not set");
+    return "";
+  }
+
+  try {
+    const url = new URL(uri);
+    // Add connection options if not already present
+    const searchParams = new URLSearchParams(url.search);
+    if (!searchParams.has("retryWrites"))
+      searchParams.set("retryWrites", "true");
+    if (!searchParams.has("w")) searchParams.set("w", "majority");
+    if (!searchParams.has("maxPoolSize")) searchParams.set("maxPoolSize", "10");
+    url.search = searchParams.toString();
+    return url.toString();
+  } catch (error) {
+    console.error("Error parsing MongoDB URI:", error);
+    return uri;
+  }
+};
+
 // Export configuration
 export const config = {
   email: {
@@ -112,7 +136,18 @@ export const config = {
     pass: process.env.EMAIL_PASS,
   },
   mongodb: {
-    uri: process.env.MONGODB_URI,
+    uri: getMongoDBUri(),
+    options: {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      family: 4, // Force IPv4
+      retryWrites: true,
+      maxPoolSize: 10,
+      minPoolSize: 5,
+      maxIdleTimeMS: 10000,
+    },
   },
   server: {
     port: parseInt(process.env.PORT, 10) || 5000,

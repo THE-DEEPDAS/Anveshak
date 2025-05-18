@@ -16,7 +16,7 @@ import pdfParse from "pdf-parse";
  * @param {Buffer} pdfBuffer - PDF buffer or text content
  * @returns {Promise<Object>} - Parsed resume data
  */
-export async function parseResumeText(pdfBuffer) {
+async function parseResumeText(pdfBuffer) {
   try {
     console.log("Starting simplified resume parsing");
     let rawText = "";
@@ -1414,20 +1414,215 @@ function getFeatureSetsByType(attributeType) {
 }
 
 /**
+ * Extract education information from resume text
+ * @param {string} text - Raw text from resume
+ * @returns {Array} - Array of education entries
+ */
+function extractEducation(text) {
+  const educationEntries = [];
+
+  // Common education section headers
+  const educationHeaders = [
+    "EDUCATION",
+    "ACADEMIC BACKGROUND",
+    "ACADEMIC HISTORY",
+    "EDUCATIONAL BACKGROUND",
+    "ACADEMIC QUALIFICATIONS",
+    "QUALIFICATIONS",
+  ];
+
+  // Try to find education section
+  let educationSection = "";
+  const lines = text.split("\n");
+  let inEducationSection = false;
+
+  for (const line of lines) {
+    const upperLine = line.trim().toUpperCase();
+
+    // Check if we're entering education section
+    if (educationHeaders.some((header) => upperLine.includes(header))) {
+      inEducationSection = true;
+      continue;
+    }
+
+    // Check if we're leaving education section (hit another major section)
+    if (
+      inEducationSection &&
+      (upperLine.includes("EXPERIENCE") ||
+        upperLine.includes("SKILLS") ||
+        upperLine.includes("PROJECTS") ||
+        upperLine.includes("PUBLICATIONS"))
+    ) {
+      break;
+    }
+
+    // Collect education section text
+    if (inEducationSection && upperLine) {
+      educationSection += upperLine + " ";
+    }
+  }
+
+  if (!educationSection) {
+    return [];
+  }
+
+  // Common degree keywords
+  const degreeKeywords = [
+    "BACHELOR",
+    "BS",
+    "BA",
+    "B.S.",
+    "B.A.",
+    "MASTER",
+    "MS",
+    "MA",
+    "M.S.",
+    "M.A.",
+    "PHD",
+    "PH.D",
+    "DOCTORATE",
+    "ASSOCIATE",
+    "AA",
+    "A.A.",
+    "BSC",
+    "B.SC",
+    "MSC",
+    "M.SC",
+  ];
+
+  // Common field of study keywords
+  const fieldKeywords = [
+    "COMPUTER SCIENCE",
+    "ENGINEERING",
+    "MATHEMATICS",
+    "PHYSICS",
+    "CHEMISTRY",
+    "BIOLOGY",
+    "BUSINESS",
+    "ECONOMICS",
+    "FINANCE",
+    "PSYCHOLOGY",
+    "SOCIOLOGY",
+    "LITERATURE",
+    "HISTORY",
+    "PHILOSOPHY",
+    "ARTS",
+    "INFORMATION TECHNOLOGY",
+    "DATA SCIENCE",
+  ];
+
+  // Try to extract individual education entries
+  const entries = educationSection.split(/[•\-\*]/);
+
+  for (const entry of entries) {
+    if (!entry.trim()) continue;
+    const educationEntry = {
+      name: "",
+      institution: "",
+      degree: "",
+      field: "",
+      startDate: "",
+      endDate: "",
+      gpa: "",
+    };
+
+    // Extract institution (often contains keywords like "University", "College", "Institute")
+    const institutionMatch = entry.match(
+      /([\w\s]+(?:UNIVERSITY|COLLEGE|INSTITUTE|SCHOOL))/i
+    );
+    if (institutionMatch) {
+      educationEntry.institution = institutionMatch[0].trim();
+    }
+
+    // Extract degree
+    for (const keyword of degreeKeywords) {
+      if (entry.includes(keyword)) {
+        const degreeMatch =
+          entry.match(new RegExp(`${keyword}[\\s\\w]*OF[\\s\\w]*`, "i")) ||
+          entry.match(new RegExp(`${keyword}[\\s\\w]*IN[\\s\\w]*`, "i")) ||
+          entry.match(new RegExp(`${keyword}[\\s\\w]*`, "i"));
+        if (degreeMatch) {
+          educationEntry.degree = degreeMatch[0].trim();
+          break;
+        }
+      }
+    }
+
+    // Extract field of study
+    for (const field of fieldKeywords) {
+      if (entry.includes(field)) {
+        educationEntry.field = field.trim();
+        break;
+      }
+    }
+
+    // Extract dates
+    const dateMatch = entry.match(
+      /(?:(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]*\.?\s*)?20\d{2}/g
+    );
+    if (dateMatch) {
+      if (dateMatch.length >= 2) {
+        educationEntry.startDate = dateMatch[0].trim();
+        educationEntry.endDate = dateMatch[1].trim();
+      } else if (dateMatch.length === 1) {
+        educationEntry.endDate = dateMatch[0].trim();
+      }
+    }
+
+    // Extract GPA if present
+    const gpaMatch =
+      entry.match(/GPA:?\s*([\d.]+)/i) || entry.match(/([\d.]+)\s*GPA/i);
+    if (gpaMatch) {
+      educationEntry.gpa = gpaMatch[1];
+    }
+
+    // Extract the name from the degree and field
+    if (educationEntry.degree && educationEntry.field) {
+      educationEntry.name = `${educationEntry.degree} in ${educationEntry.field}`;
+    } else if (educationEntry.degree) {
+      educationEntry.name = educationEntry.degree;
+    } else if (educationEntry.field) {
+      educationEntry.name = educationEntry.field;
+    }
+
+    // If we have an institution, make the name more complete
+    if (educationEntry.institution) {
+      if (educationEntry.name) {
+        educationEntry.name = `${educationEntry.name} from ${educationEntry.institution}`;
+      } else {
+        educationEntry.name = educationEntry.institution;
+      }
+    }
+
+    // Only add entries that have at least an institution or degree
+    if (educationEntry.institution || educationEntry.degree) {
+      educationEntries.push(educationEntry);
+    }
+  }
+
+  return educationEntries;
+}
+
+/**
  * Format the parsed resume data
  * @param {Object} parsedResume - The parsed resume data
  * @returns {Object} - Formatted resume data
  */
-export function formatResumeData(parsedResume) {
+function formatResumeData(parsedResume) {
   return {
     skills: parsedResume.skills || [],
     experience: parsedResume.experience || [],
     projects: parsedResume.projects || [],
+    education: extractEducation(parsedResume.rawText) || [],
     rawText: parsedResume.rawText || "",
   };
 }
 
-export default {
+export {
   parseResumeText,
   formatResumeData,
+  extractSkills,
+  extractExperience,
+  extractProjects,
+  extractEducation,
 };

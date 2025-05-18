@@ -281,14 +281,31 @@ export const researchCompany = async (companyName) => {
     const model = getModel();
     const prompt = `
       Research the company "${companyName}" and provide the following information:
-      1. Brief company overview
-      2. Notable achievements and milestones
-      3. Company culture and values
-      4. Current projects or products
-      5. Tech stack or technologies used (if available)
+      1. Brief company overview (focus on their technical products/services)
+      2. Notable achievements and milestones (especially technical ones)
+      3. Company culture and values (engineering culture emphasis)
+      4. Current projects or products (technical details)
+      5. Tech stack breakdown in these categories:
+         - Frontend: frameworks, libraries, tools
+         - Backend: languages, frameworks, databases
+         - DevOps: cloud services, tools, practices
+         - Other: domain-specific technologies
       
-      Return as a JSON object with properties: overview, achievements, culture, projects, techStack
-      Keep it concise but informative.
+      Return a JSON object with these properties:
+      {
+        "overview": "Company technical overview",
+        "achievements": "Notable technical achievements",
+        "culture": "Engineering culture description",
+        "projects": "Current technical projects",
+        "techStack": {
+          "frontend": ["tech1", "tech2"],
+          "backend": ["tech1", "tech2"],
+          "devops": ["tech1", "tech2"],
+          "other": ["tech1", "tech2"]
+        }
+      }
+
+      Keep responses factual and technically focused.
     `;
 
     const result = await model.generateContent(prompt);
@@ -393,44 +410,96 @@ export const generateEmailContent = async ({
   userName,
   userEmail,
   company,
-  skills,
-  experience,
-  projects,
-  role,
-  companyResearch,
+  skills = [],
+  experience = [],
+  projects = [],
+  role = "position of interest",
+  companyResearch = {
+    overview: "",
+    achievements: "",
+    culture: "",
+    projects: "",
+    techStack: {},
+  },
 }) => {
   if (!genAI) return getMockEmailContent(company, role);
-
   try {
     const model = getModel();
-    const skillsStr = skills.join(", ");
-    const experienceStr = experience.join("\n");
-    const projectsStr = projects.join("\n");
+
+    // Validate and normalize input arrays
+    const skillsStr = Array.isArray(skills)
+      ? skills.filter(Boolean).join(", ")
+      : "";
+    const experienceStr = Array.isArray(experience)
+      ? experience.filter(Boolean).join("\n")
+      : "";
+    const projectsStr = Array.isArray(projects)
+      ? projects.filter(Boolean).join("\n")
+      : "";
 
     const prompt = `
-      Write a personalized cold email for ${userName} (${userEmail}) to send to ${company} for a ${role} position.
+      Write a highly personalized cold email for ${userName} to send to ${company} for a ${role} position.
+
+      CANDIDATE BACKGROUND:
+      Skills & Technologies:
+      ${skillsStr}
+
+      Experience Highlights:
+      ${experienceStr}
+
+      Relevant Projects:
+      ${projectsStr}
+
+      COMPANY RESEARCH:
+      Company Overview: ${companyResearch.overview}
+      Recent Achievements: ${companyResearch.achievements}
+      Company Culture: ${companyResearch.culture}
+      Current Projects: ${companyResearch.projects}
+      Tech Stack: ${JSON.stringify(companyResearch.techStack)}
+
+      EMAIL REQUIREMENTS:
+      1. Subject Line:
+         - Be specific and attention-grabbing
+         - Reference the role and a key skill match
+         - Keep it under 60 characters
+
+      2. Email Structure:
+         a) Opening (2-3 sentences):
+            - Reference a specific company achievement or project
+            - Show understanding of their work
+            - Connect it to your interest in the role
+
+         b) Skills Match (1-2 paragraphs):
+            - Highlight 2-3 most relevant skills
+            - Connect your experience to their tech stack
+            - Give specific examples from your projects
+            - Use metrics and results where possible
+
+         c) Culture & Values (1 paragraph):
+            - Connect your experience to their company culture
+            - Show alignment with their values
+            - Reference their current projects
+
+         d) Call to Action:
+            - Request a specific next step
+            - Offer to provide more information
+            - Thank them for their time
+
+      3. Tone & Style:
+         - Professional but conversational
+         - Show enthusiasm without being over-eager
+         - Be confident but humble
+         - Focus on what you can contribute
+
+      FORMAT:
+      Return a JSON object with "subject" and "body". Make sure the body uses proper paragraphs and line breaks.
       
-      About ${userName}:
-      - Skills: ${skillsStr}
-      - Experience: ${experienceStr}
-      - Projects: ${projectsStr}
-      
-      Company Research:
-      - Overview: ${companyResearch.overview}
-      - Achievements: ${companyResearch.achievements}
-      - Culture: ${companyResearch.culture}
-      - Projects: ${companyResearch.projects}
-      - Tech Stack: ${companyResearch.techStack}
-      
-      Guidelines:
-      1. Start by mentioning a specific achievement or project of ${company} to show research
-      2. Reference how their tech stack aligns with your skills
-      3. Describe a specific project you've done that's relevant to their work
-      4. Connect your experience to their company culture
-      5. Express genuine interest in their current projects
-      6. End with a clear call to action
-      7. Keep it under 250 words
-      8. Make the subject line specific and attention-grabbing
+      VALIDATION:
+      - Must reference at least one specific company achievement/project
+      - Must connect candidate skills to company tech stack
+      - Must include specific examples from experience/projects
+      - Must have a clear call to action
+      - Keep total length between 200-250 words
       
       Return as JSON with properties: subject, body
     `;
@@ -466,72 +535,90 @@ export const generateEmailContent = async ({
 };
 
 // Generate a personalized email for a research internship application
-export const generateBetterEmailWithLLM = async ({
-  facultyName,
-  facultyResearch,
-  facultyPublications,
-  facultyProjects,
-  userSkills,
-  userExperience,
-  userProjects,
-}) => {
+export const generateBetterEmailWithLLM = async (context) => {
   try {
     const model = getModel();
     if (!model) {
       throw new Error("AI model not initialized");
     }
 
-    const prompt = `Generate a personalized email for a research internship application.
+    // Extract data from context
+    const { faculty, candidate, matches } = context;
+
+    const prompt = `Write a personalized research internship application email in plain text format.
 
 Context:
-- Professor: ${facultyName}
-- Research Areas: ${facultyResearch.join(", ")}
-- Recent Publications: ${facultyPublications.join(", ")}
-- Current Projects: ${facultyProjects.join(", ")}
+- Professor: ${faculty.name}
+- Department: ${faculty.department || ""}
+- Research Areas: ${(faculty.researchInterests || []).join(", ")}
+${
+  faculty.publications
+    ? `- Recent Publications: ${faculty.publications.join(", ")}`
+    : ""
+}
+${faculty.projects ? `- Current Projects: ${faculty.projects.join(", ")}` : ""}
 
 Student Profile:
-- Skills: ${userSkills.join(", ")}
-- Experience: ${userExperience.join(", ")}
-- Projects: ${userProjects.join(", ")}
+- Skills: ${(candidate.skills || []).join(", ")}
+${
+  matches.relevantExperience
+    ? `- Relevant Experience: ${matches.relevantExperience
+        .map((exp) => exp.title)
+        .join(", ")}`
+    : ""
+}
+${
+  matches.relevantProjects
+    ? `- Relevant Projects: ${matches.relevantProjects
+        .map((proj) => proj.title)
+        .join(", ")}`
+    : ""
+}
 
-Requirements:
-1. Create a compelling subject line
-2. Write a formal but engaging email body
-3. Highlight relevant skills and projects that align with the professor's research
-4. Mention specific publications or projects that interest you
-5. Keep it concise (250-300 words)
-6. Be respectful and professional
-7. End with a clear call to action
+FORMAT:
+1. Start with:
+   Subject: [Write a clear subject line]
 
-Format the response as a JSON object with 'subject' and 'body' fields.`;
+2. Then write the email body
+   - Start with "Dear Dr. [Name]"
+   - Use proper paragraphs and line breaks
+   - End with a professional signature
+
+REQUIREMENTS:
+1. Reference specific research areas
+2. Connect student's skills to professor's work
+3. Highlight relevant projects and experience
+4. Keep it concise (250-300 words)
+5. Include a clear call to action
+6. Be formal and professional
+
+Write the complete email now, starting with "Subject:" on its own line.`;
 
     const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const text = result.response.text(); // Clean and parse the response
+    const cleanText = text
+      .replace(/```[\s\S]*?```/g, "") // Remove any code blocks
+      .replace(/\\n/g, "\n") // Replace escaped newlines
+      .replace(/\\"/g, '"') // Replace escaped quotes
+      .trim();
 
-    try {
-      // Extract JSON from the response
-      const match = text.match(/\{[\s\S]*\}/);
-      if (match) {
-        const jsonStr = match[0];
-        const parsed = JSON.parse(jsonStr);
-        return {
-          subject: parsed.subject,
-          body: parsed.body,
-        };
-      }
-    } catch (error) {
-      console.error("Error parsing AI response:", error);
+    // Extract subject and body
+    const subjectMatch = cleanText.match(/Subject:\s*(.+?)(?:\n|$)/i);
+    const subject = subjectMatch
+      ? subjectMatch[1].trim()
+      : "Research Internship Application";
+
+    // Get everything after the subject line as the body
+    const body = cleanText.replace(/Subject:.+?(?:\n|$)/i, "").trim();
+
+    // Ensure both subject and body are present
+    if (!subject || !body) {
+      throw new Error("Failed to generate complete email content");
     }
 
-    // Fallback if JSON parsing fails: try to extract subject and body using regex
-    const subjectMatch = text.match(/subject["\s:]+([^\n"]+)/i);
-    const bodyMatch = text.match(/body["\s:]+([^}]+)/i);
-
     return {
-      subject: subjectMatch
-        ? subjectMatch[1].trim()
-        : "Research Internship Application",
-      body: bodyMatch ? bodyMatch[1].trim() : text,
+      subject,
+      body,
     };
   } catch (error) {
     console.error("Error generating email with LLM:", error);

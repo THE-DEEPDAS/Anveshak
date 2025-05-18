@@ -89,3 +89,34 @@ export const generatePreviewEmails = async (resumeId, selectedFaculty) => {
     );
   }
 };
+
+export const regenerateEmail = async (resume, faculty) => {
+  try {
+    const response = await axios.post(
+      `${API_ENDPOINTS.academic}/regenerate-email`,
+      {
+        resumeId: resume.id,
+        facultyId: faculty._id,
+      }
+    );
+
+    if (!response.data?.content) {
+      throw new Error("No email content received");
+    }
+
+    return response.data.content;
+
+    if (!response.data?.email) {
+      throw new Error("Failed to regenerate email");
+    }
+
+    return response.data.email;
+  } catch (error) {
+    console.error("Error regenerating email:", error);
+    throw new Error(
+      error.response?.data?.message ||
+        error.message ||
+        "Failed to regenerate email"
+    );
+  }
+};

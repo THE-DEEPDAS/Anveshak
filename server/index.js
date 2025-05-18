@@ -11,6 +11,10 @@ import compression from "compression";
 import { config } from "./config/config.js";
 import Faculty from "./models/Faculty.js";
 import Institution from "./models/Institution.js";
+import { EventEmitter } from "events";
+
+// Increase max listeners
+EventEmitter.defaultMaxListeners = 15;
 
 // Routes
 import resumeRoutes from "./routes/resumeRoutes.js";
@@ -121,7 +125,17 @@ app.use("/api/academic", academicRoutes);
 
 // Database connection
 mongoose
-  .connect(config.mongodb.uri)
+  .connect(config.mongodb.uri, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+    family: 4, // Force IPv4
+    retryWrites: true,
+    maxPoolSize: 10,
+    minPoolSize: 5,
+    maxIdleTimeMS: 10000,
+  })
   .then(async () => {
     console.log("Connected to MongoDB");
 
@@ -144,8 +158,24 @@ mongoose
   })
   .catch((error) => {
     console.error("MongoDB connection error:", error);
-    process.exit(1);
+    // Don't exit process, let it retry
+    if (error.name === "MongooseServerSelectionError") {
+      console.log("Will retry connection automatically...");
+    }
   });
+
+// Handle MongoDB connection events
+mongoose.connection.on("error", (err) => {
+  console.error("MongoDB connection error:", err);
+});
+
+mongoose.connection.on("disconnected", () => {
+  console.log("MongoDB disconnected. Attempting to reconnect...");
+});
+
+mongoose.connection.on("reconnected", () => {
+  console.log("MongoDB reconnected successfully");
+});
 
 // Serve static files in production
 if (config.server.nodeEnv === "production") {
