@@ -11,8 +11,66 @@ import Resume from "../models/Resume.js";
 
 const router = express.Router();
 
+/**
+ * Generate email previews for selected faculty
+ */
+router.post("/generate-preview-emails", async (req, res) => {
+  try {
+    const { resumeId, selectedFaculty } = req.body;
+
+    if (
+      !resumeId ||
+      !Array.isArray(selectedFaculty) ||
+      selectedFaculty.length === 0
+    ) {
+      return res.status(400).json({
+        message: "Resume ID and selected faculty array are required",
+      });
+    }
+
+    // Get resume data
+    const resume = await Resume.findById(resumeId);
+    if (!resume) {
+      return res.status(404).json({ message: "Resume not found" });
+    }
+
+    // Generate emails for each faculty member
+    const emails = [];
+    for (const faculty of selectedFaculty) {
+      try {
+        const emailContent = await generateBetterEmail(faculty, resume);
+        emails.push({
+          faculty,
+          subject: emailContent.subject,
+          content: emailContent.body,
+        });
+      } catch (error) {
+        console.error(`Error generating email for ${faculty.name}:`, error);
+        // Continue with other faculty members even if one fails
+      }
+    }
+
+    if (emails.length === 0) {
+      return res.status(500).json({
+        message: "Failed to generate any email previews",
+      });
+    }
+
+    res.json({ emails });
+  } catch (error) {
+    console.error("Error generating email previews:", error);
+    res.status(500).json({
+      message: "Error generating email previews",
+      error: error.message,
+    });
+  }
+});
+
 // Protect all routes
 router.use(authenticateToken);
+
+// Helper function to wait between email sends
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Route to search for faculty and generate emails.
@@ -50,7 +108,7 @@ router.post("/search-and-email", async (req, res) => {
   }
 });
 
-// Send emails to selected faculty members
+// Send emails to selected faculty members with rate limiting
 router.post("/send-faculty-emails", async (req, res) => {
   try {
     const { resumeId, selectedFaculty } = req.body;
@@ -71,7 +129,11 @@ router.post("/send-faculty-emails", async (req, res) => {
       return res.status(404).json({ message: "Resume not found" });
     }
 
-    const emailPromises = selectedFaculty.map(async (faculty) => {
+    const results = [];
+    const failedEmails = [];
+
+    // Process emails with rate limiting
+    for (const faculty of selectedFaculty) {
       try {
         // Generate personalized email content
         const emailContent = await generateBetterEmail(faculty, resume);
@@ -92,132 +154,107 @@ router.post("/send-faculty-emails", async (req, res) => {
             overview: faculty.researchInterests?.join(", "),
           },
           matchReason: "Research interests alignment",
+          retryCount: 0, // Track retry attempts
         });
 
-        // Save email
+        // Save email first as draft
         await email.save();
 
-        // Send email
-        await sendEmail({
-          to: faculty.email,
-          subject: email.subject,
-          text: email.body,
-          replyTo: resume.user.email,
-        });
+        try {
+          // Attempt to send email
+          await sendEmail({
+            to: faculty.email,
+            subject: email.subject,
+            text: email.body,
+            replyTo: resume.user.email,
+          });
 
-        // Update email status
-        email.status = "sent";
-        email.sentAt = new Date();
-        await email.save();
+          // Update email status on success
+          email.status = "sent";
+          email.sentAt = new Date();
+          await email.save();
 
-        return {
-          success: true,
-          emailId: email._id,
-          recipient: faculty.email,
-          facultyName: faculty.name,
-        };
+          results.push({
+            success: true,
+            emailId: email._id,
+            recipient: faculty.email,
+            facultyName: faculty.name,
+          });
+        } catch (sendError) {
+          console.error(`Error sending email to ${faculty.email}:`, sendError);
+
+          // Update email status on failure
+          email.status = "failed";
+          email.lastError = sendError.message;
+          await email.save();
+
+          failedEmails.push({
+            success: false,
+            emailId: email._id,
+            recipient: faculty.email,
+            facultyName: faculty.name,
+            error: sendError.message,
+          });
+        }
+
+        // Rate limit: wait between sends
+        await delay(1000); // 1 second delay between emails
       } catch (error) {
-        console.error(`Error sending email to ${faculty.email}:`, error);
-        return {
+        console.error(
+          `Error processing faculty member ${faculty.name}:`,
+          error
+        );
+        failedEmails.push({
           success: false,
           recipient: faculty.email,
           facultyName: faculty.name,
           error: error.message,
-        };
+        });
       }
-    });
-
-    const results = await Promise.all(emailPromises);
-
-    // Check if any emails failed to send
-    const failedEmails = results.filter((result) => !result.success);
-    if (failedEmails.length > 0) {
-      return res.status(207).json({
-        message: "Some emails failed to send",
-        results,
-      });
     }
 
+    // Return appropriate response based on results
+    if (failedEmails.length > 0) {
+      if (results.length === 0) {
+        // All emails failed
+        return res.status(500).json({
+          message: "Failed to send all emails",
+          results: failedEmails,
+        });
+      } else {
+        // Some emails failed
+        return res.status(207).json({
+          message: "Some emails failed to send",
+          results: [...results, ...failedEmails],
+          summary: {
+            total: selectedFaculty.length,
+            sent: results.length,
+            failed: failedEmails.length,
+          },
+        });
+      }
+    }
+
+    // All emails sent successfully
     return res.status(200).json({
       message: "All emails sent successfully",
       results,
+      summary: {
+        total: selectedFaculty.length,
+        sent: results.length,
+        failed: 0,
+      },
     });
   } catch (error) {
     console.error("Error sending faculty emails:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
-
-/**
- * Route to generate personalized emails for selected faculty
- */
-router.post("/generate", async (req, res) => {
-  try {
-    const { resumeId, facultyIds } = req.body;
-
-    if (!resumeId || !Array.isArray(facultyIds) || facultyIds.length === 0) {
-      return res
-        .status(400)
-        .json({ message: "Resume ID and faculty IDs are required" });
-    }
-
-    // Find resume
-    const resume = await Resume.findById(resumeId);
-    if (!resume) {
-      return res.status(404).json({ message: "Resume not found" });
-    }
-
-    // Generate emails for each faculty member
-    const emailPromises = facultyIds.map(async (facultyId) => {
-      const faculty = await Faculty.findById(facultyId).populate("institution");
-
-      if (!faculty) {
-        throw new Error(`Faculty not found: ${facultyId}`);
-      }
-
-      // Generate email content with LLM
-      const emailContent = await generateBetterEmail(faculty, resume);
-
-      // Create new email document
-      const email = new Email({
-        user: resume.user,
-        resume: resume._id,
-        company: faculty.institution.name,
-        recipient: faculty.email,
-        role: "Research Internship",
-        subject: emailContent.subject,
-        body: emailContent.body,
-        status: "draft",
-        companyResearch: {
-          overview: faculty.researchInterests.join(", "),
-          projects: faculty.projects.join(", "),
-          achievements: faculty.publications.join(", "),
-        },
-        matchReason: `Research interests align with your ${
-          resume.skills.some((skill) =>
-            faculty.researchInterests.some((interest) =>
-              interest.toLowerCase().includes(skill.toLowerCase())
-            )
-          )
-            ? "skills"
-            : "experience"
-        }`,
-      });
-
-      return email.save();
+    res.status(500).json({
+      message: "Server error processing emails",
+      error: error.message,
     });
-
-    const savedEmails = await Promise.all(emailPromises);
-    res.status(200).json({ emails: savedEmails });
-  } catch (error) {
-    console.error("Error generating academic emails:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
-/**
- * Route to get extra findings based on domains.
- */
+// Extra findings route
 router.post("/extra-findings", async (req, res) => {
   try {
     const { domains } = req.body;
@@ -263,9 +300,9 @@ router.post("/extra-findings", async (req, res) => {
 });
 
 /**
- * Route to handle sending emails to selected faculty members
+ * Generate email previews for selected faculty
  */
-router.post("/send-faculty-emails", async (req, res) => {
+router.post("/generate-preview-emails", async (req, res) => {
   try {
     const { resumeId, selectedFaculty } = req.body;
 
@@ -274,91 +311,46 @@ router.post("/send-faculty-emails", async (req, res) => {
       !Array.isArray(selectedFaculty) ||
       selectedFaculty.length === 0
     ) {
-      return res
-        .status(400)
-        .json({ message: "Resume ID and selected faculty are required" });
+      return res.status(400).json({
+        message: "Resume ID and selected faculty array are required",
+      });
     }
 
-    // Find resume with user data
-    const resume = await Resume.findById(resumeId).populate("user");
+    // Get resume data
+    const resume = await Resume.findById(resumeId);
     if (!resume) {
       return res.status(404).json({ message: "Resume not found" });
     }
 
-    const emailPromises = selectedFaculty.map(async (faculty) => {
+    // Generate emails for each faculty member
+    const emails = [];
+    for (const faculty of selectedFaculty) {
       try {
-        // Generate personalized email content
         const emailContent = await generateBetterEmail(faculty, resume);
-
-        // Create email document
-        const email = new Email({
-          user: resume.user._id,
-          resume: resume._id,
-          company: faculty.institution?.name || "Unknown Institution",
-          recipient: faculty.email,
-          role: `${faculty.department || "Research"} Faculty`,
-          subject:
-            emailContent.subject ||
-            `Research Collaboration Interest - ${resume.user.name}`,
-          body: emailContent.body,
-          status: "draft",
-          companyResearch: {
-            overview: faculty.researchInterests?.join(", "),
-          },
-          matchReason: "Research interests alignment",
+        emails.push({
+          faculty,
+          subject: emailContent.subject,
+          content: emailContent.body,
         });
-
-        // Save email
-        await email.save();
-
-        // Send email
-        await sendEmail({
-          to: faculty.email,
-          subject: email.subject,
-          text: email.body,
-          replyTo: resume.user.email,
-        });
-
-        // Update email status
-        email.status = "sent";
-        email.sentAt = new Date();
-        await email.save();
-
-        return {
-          success: true,
-          emailId: email._id,
-          recipient: faculty.email,
-          facultyName: faculty.name,
-        };
       } catch (error) {
-        console.error(`Error sending email to ${faculty.email}:`, error);
-        return {
-          success: false,
-          recipient: faculty.email,
-          facultyName: faculty.name,
-          error: error.message,
-        };
+        console.error(`Error generating email for ${faculty.name}:`, error);
+        // Continue with other faculty members even if one fails
       }
-    });
+    }
 
-    const results = await Promise.all(emailPromises);
-
-    // Check if any emails failed to send
-    const failedEmails = results.filter((result) => !result.success);
-    if (failedEmails.length > 0) {
-      return res.status(207).json({
-        message: "Some emails failed to send",
-        results,
+    if (emails.length === 0) {
+      return res.status(500).json({
+        message: "Failed to generate any email previews",
       });
     }
 
-    return res.status(200).json({
-      message: "All emails sent successfully",
-      results,
-    });
+    res.json({ emails });
   } catch (error) {
-    console.error("Error sending faculty emails:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Error generating email previews:", error);
+    res.status(500).json({
+      message: "Error generating email previews",
+      error: error.message,
+    });
   }
 });
 

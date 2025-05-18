@@ -2,9 +2,18 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
 import Button from "../ui/Button";
-import { FaGraduationCap, FaSpinner, FaCheck } from "react-icons/fa";
-import { searchAcademicFaculty } from "../../services/academicEmailService";
+import {
+  FaGraduationCap,
+  FaSpinner,
+  FaCheck,
+  FaEnvelope,
+} from "react-icons/fa";
+import {
+  searchAcademicFaculty,
+  generatePreviewEmails,
+} from "../../services/academicEmailService";
 import { useToast } from "../ui/Toaster";
+import EmailPreview from "./EmailPreview";
 
 const AcademicEmailGenerator = () => {
   const { resume } = useAppContext();
@@ -14,7 +23,10 @@ const AcademicEmailGenerator = () => {
   const [faculty, setFaculty] = useState([]);
   const [selectedFaculty, setSelectedFaculty] = useState([]);
   const [step, setStep] = useState(1);
-  const handleSendEmails = async () => {
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewEmails, setPreviewEmails] = useState([]);
+
+  const handlePreviewEmails = async () => {
     if (!resume?.id) {
       showToast("Please upload a resume first", "error");
       return;
@@ -27,7 +39,64 @@ const AcademicEmailGenerator = () => {
 
     setIsLoading(true);
     try {
-      const response = await fetch("/api/academic/send-faculty-emails", {
+      const emails = await generatePreviewEmails(resume.id, selectedFaculty);
+      setPreviewEmails(emails);
+      setShowPreview(true);
+    } catch (error) {
+      console.error("Error generating email previews:", error);
+      showToast(error.message || "Failed to generate email previews", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateEmail = async (recipient, newContent) => {
+    const emailToUpdate = previewEmails.find(
+      (email) => email.recipient === recipient
+    );
+    if (!emailToUpdate) return;
+
+    try {
+      // Store the updated content
+      setPreviewEmails((prev) =>
+        prev.map((email) =>
+          email.recipient === recipient
+            ? { ...email, content: newContent }
+            : email
+        )
+      );
+      showToast("Email content updated successfully", "success");
+    } catch (error) {
+      console.error("Error updating email:", error);
+      showToast("Failed to update email content", "error");
+    }
+  };
+
+  const handleRegenerateEmail = async (email) => {
+    try {
+      setIsLoading(true);
+      const faculty = selectedFaculty.find((f) => f.email === email.recipient);
+      if (!faculty) throw new Error("Faculty member not found");
+
+      const newContent = await regenerateEmail(resume, faculty, email.content);
+
+      setPreviewEmails((prev) =>
+        prev.map((e) =>
+          e.recipient === email.recipient ? { ...e, content: newContent } : e
+        )
+      );
+      showToast("Email regenerated successfully", "success");
+    } catch (error) {
+      console.error("Error regenerating email:", error);
+      showToast(error.message || "Failed to regenerate email", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSendEmails = async (email) => {
+    try {
+      const response = await fetch("/api/academic/send-faculty-email", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -35,37 +104,25 @@ const AcademicEmailGenerator = () => {
         },
         body: JSON.stringify({
           resumeId: resume.id,
-          selectedFaculty: selectedFaculty.map((faculty) => ({
-            _id: faculty._id,
-            name: faculty.name,
-            email: faculty.email,
-            department: faculty.department,
-            institution: faculty.institution,
-            researchInterests: faculty.researchInterests,
-          })),
+          faculty: {
+            _id: email.facultyId,
+            email: email.recipient,
+          },
+          content: email.content,
+          subject: email.subject,
         }),
       });
 
       const data = await response.json();
 
-      if (response.ok) {
-        showToast(data.message || "Emails sent successfully!", "success");
-        navigate("/dashboard");
-      } else if (response.status === 207) {
-        // Some emails failed
-        showToast(
-          "Some emails failed to send. Check dashboard for details.",
-          "warning"
-        );
-        navigate("/dashboard");
-      } else {
-        throw new Error(data.message || "Failed to send emails");
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to send email");
       }
+
+      return data;
     } catch (error) {
-      console.error("Error sending emails:", error);
-      showToast(error.message || "Failed to send emails", "error");
-    } finally {
-      setIsLoading(false);
+      console.error("Error sending email:", error);
+      throw error;
     }
   };
 
@@ -145,7 +202,6 @@ const AcademicEmailGenerator = () => {
           </div>
           <FaGraduationCap className="h-12 w-12 text-blue-600" />
         </div>
-
         {/* Step 1: Initial Search */}
         {step === 1 && (
           <div className="bg-white rounded-lg shadow-md p-6">
@@ -170,7 +226,6 @@ const AcademicEmailGenerator = () => {
             </div>
           </div>
         )}
-
         {/* Step 2: Faculty Selection */}
         {step === 2 && (
           <div className="space-y-6">
@@ -238,16 +293,26 @@ const AcademicEmailGenerator = () => {
               <Button
                 variant="primary"
                 size="lg"
-                onClick={handleSendEmails}
+                onClick={handlePreviewEmails}
                 isLoading={isLoading}
                 disabled={selectedFaculty.length === 0 || isLoading}
               >
-                Send Emails ({selectedFaculty.length} selected)
+                <FaEnvelope className="mr-2" />
+                Preview & Send ({selectedFaculty.length} selected)
               </Button>
             </div>
           </div>
-        )}
+        )}{" "}
       </div>
+      {showPreview && (
+        <EmailPreview
+          emails={previewEmails}
+          onSend={handleSendEmails}
+          onClose={() => setShowPreview(false)}
+          onUpdateEmail={handleUpdateEmail}
+          onRegenerate={handleRegenerateEmail}
+        />
+      )}
     </div>
   );
 };

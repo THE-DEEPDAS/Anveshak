@@ -2,13 +2,7 @@ import axios from "axios";
 import { config } from "../config/config.js";
 import Faculty from "../models/Faculty.js";
 import Institution from "../models/Institution.js";
-import { generateBetterEmailWithLLM } from "./aiService.js";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-// Initialize Gemini API
-const genAI = process.env.GEMINI_API_KEY
-  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-  : null;
+import { generateBetterEmailWithLLM, genAI } from "./aiService.js";
 
 // Helper function to escape special regex characters
 function escapeRegExp(string) {
@@ -36,35 +30,72 @@ async function findFacultyWithLLM(domains) {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const prompt = `
-      Given these technical skills and research interests: ${domains.join(", ")}
+      You are a faculty search assistant. Generate an array of faculty members based on these skills: ${domains.join(
+        ", "
+      )}
+
+      STRICT OUTPUT FORMAT:
+      Respond ONLY with a JSON array. Each object in the array must have these exact fields:
+      {
+        "name": "string",
+        "department": "string",
+        "institution": "string",
+        "researchInterests": ["string"],
+        "website": "string or null"
+      }
+
+      SEARCH CRITERIA:
+      1. Find professors whose research aligns with: ${domains.join(", ")}
+      2. Focus on robotics, drones, UAVs, AI, and related fields
+      3. Only include faculty from Indian institutions (IITs, NITs, IISc, DRDO)
+      4. If no exact matches, include faculty in related fields
       
-      Search our faculty database for professors and researchers who:
-      1. Have research interests matching these skills
-      2. Work in robotics, drones, UAVs, AI, or related fields
-      3. Are from Indian institutions (IITs, NITs, IISc, DRDO, etc.)
-      
-      For each faculty member, provide:
-      - Name
-      - Department
-      - Institution
-      - Research interests
-      - Website (if available)
-      
-      Format as JSON array of objects with these fields.
-      If no exact matches, include faculty in related or overlapping fields.
+      EXAMPLE RESPONSE FORMAT:
+      [
+        {
+          "name": "Dr. Ramesh Kumar",
+          "department": "Mechanical Engineering",
+          "institution": "IIT Delhi",
+          "researchInterests": ["Robotics", "Control Systems", "AI"],
+          "website": "http://me.iitd.ac.in/ramesh"
+        }
+      ]
+
+      Generate 5-10 relevant faculty members. Output only valid JSON.
     `;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    const responseText = response.text();
+    let responseText = response.text();
+
+    // Attempt to extract JSON from the response if it contains other text
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      responseText = jsonMatch[0];
+    }
 
     try {
       const facultyList = JSON.parse(responseText);
       if (Array.isArray(facultyList) && facultyList.length > 0) {
-        return facultyList;
+        // Validate the structure of each faculty member
+        const validFacultyList = facultyList.filter((faculty) => {
+          return (
+            faculty &&
+            typeof faculty === "object" &&
+            typeof faculty.name === "string" &&
+            typeof faculty.department === "string" &&
+            typeof faculty.institution === "string" &&
+            Array.isArray(faculty.researchInterests)
+          );
+        });
+
+        if (validFacultyList.length > 0) {
+          return validFacultyList;
+        }
       }
     } catch (e) {
       console.error("Failed to parse LLM response:", e);
+      console.error("Response text:", responseText);
     }
   } catch (error) {
     console.error("LLM search failed:", error);
@@ -177,84 +208,175 @@ export const searchFaculty = async (domains) => {
   }
 };
 
+/**
+ * Filter faculty by research interests
+ */
+export const filterFacultyByInterests = (faculty, interests) => {
+  return faculty.filter((f) => {
+    return (
+      f.researchInterests &&
+      f.researchInterests.some((interest) => {
+        return interests.some((i) =>
+          interest.toLowerCase().includes(i.toLowerCase())
+        );
+      })
+    );
+  });
+};
+
+/**
+ * Generate a personalized email for a faculty member
+ */
 export const generateBetterEmail = async (faculty, resume) => {
+  if (!faculty || !resume) {
+    throw new Error("Faculty and resume data are required");
+  }
+
+  if (!genAI) {
+    throw new Error("AI service not configured");
+  }
+
   try {
-    if (!faculty || !resume) {
-      throw new Error("Faculty and resume data are required");
-    }
-
-    if (!genAI) {
-      throw new Error("AI service not configured");
-    }
-
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    // Extract key experiences and projects that match faculty research interests
+    const relevantExperience =
+      resume.experience?.filter((exp) =>
+        faculty.researchInterests?.some(
+          (interest) =>
+            exp.description?.toLowerCase().includes(interest.toLowerCase()) ||
+            exp.title?.toLowerCase().includes(interest.toLowerCase())
+        )
+      ) || [];
+
+    const relevantProjects =
+      resume.projects?.filter((project) =>
+        faculty.researchInterests?.some(
+          (interest) =>
+            project.description
+              ?.toLowerCase()
+              .includes(interest.toLowerCase()) ||
+            project.title?.toLowerCase().includes(interest.toLowerCase())
+        )
+      ) || [];
+
+    // Extract relevant skills based on faculty's research
+    const relevantSkills =
+      resume.skills?.filter((skill) =>
+        faculty.researchInterests?.some(
+          (interest) =>
+            interest.toLowerCase().includes(skill.toLowerCase()) ||
+            skill.toLowerCase().includes(interest.toLowerCase())
+        )
+      ) || [];
     const prompt = `
-      Create a personalized email to Professor ${faculty.name} at ${
+      Write a personalized academic email to ${faculty.name} at ${
       faculty.institution?.name || "their institution"
     }.
-      
+
+      CONTEXT:
       Professor's Details:
       - Department: ${faculty.department || "Research"}
-      - Research Interests: ${
+      - Research Areas: ${
         faculty.researchInterests?.join(", ") || "various research areas"
       }
+      - Institution: ${faculty.institution?.name}
       
-      Student's Background:
-      - Skills: ${resume.skills?.join(", ")}
-      - Experience: ${resume.experience
-        ?.map((exp) => exp.title + " at " + exp.company)
-        .join(", ")}
-      - Projects: ${resume.projects?.map((proj) => proj.title).join(", ")}
-      
-      Requirements:
-      1. Write a formal but engaging email
-      2. Show genuine interest in their research
-      3. Highlight relevant skills and experience
-      4. Be specific about potential collaboration areas
-      5. Keep it concise (max 250 words)
-      6. Include a clear call to action
-      
-      Format the response as a JSON object with:
-      {
-        "subject": "Email subject line",
-        "body": "Email body text"
+      Your Background:
+      ${
+        relevantSkills.length > 0
+          ? `- Relevant Skills: ${relevantSkills.join(", ")}`
+          : ""
       }
+      ${
+        relevantExperience.length > 0
+          ? `- Relevant Experience:\n${relevantExperience
+              .map(
+                (exp) =>
+                  `  * ${exp.title} at ${exp.company}: ${exp.description}`
+              )
+              .join("\n")}`
+          : ""
+      }
+      ${
+        relevantProjects.length > 0
+          ? `- Relevant Projects:\n${relevantProjects
+              .map((proj) => `  * ${proj.title}: ${proj.description}`)
+              .join("\n")}`
+          : ""
+      }
+      ${
+        resume.education
+          ? `- Education: ${resume.education
+              .map(
+                (edu) => `${edu.degree} in ${edu.field} from ${edu.institution}`
+              )
+              .join(", ")}`
+          : ""
+      }
+      
+      CREATE EMAIL WITH THIS EXACT STRUCTURE:
+      1. Subject line should include:
+         - Specific research area (e.g., "Research Inquiry: Robotics and Control Systems")
+         - Position type (PhD/Research position)
+         - Main relevant skill
+         Example: "Research Position Inquiry: AI & Robotics - Background in Deep Learning"
+
+      2. Email body structure:
+         Paragraph 1: Knowledge of their research
+         - Mention specific research areas
+         - Show understanding of their work
+         - Connect their work to your interests
+
+         Paragraph 2: Your relevant background
+         - Highlight experiences matching their research
+         - Mention specific projects and results
+         - Focus on technical skills relevant to them
+
+         Paragraph 3: Why their lab specifically
+         - Why you want to work with them
+         - Future research goals
+         - How you can contribute
+
+         Closing:
+         - Request for meeting/discussion
+         - Professional sign-off
+         - Your name and current status
+
+      FORMAT:
+      Subject: [Your subject line]
+
+      Dear Professor [Name],
+
+      [Body paragraphs]
+
+      [Closing]
+
+      [Your name]
+      [Current status/institution]
+
+      IMPORTANT:
+      - Keep tone formal but engaging
+      - Be specific and concise
+      - Show genuine interest
+      - Focus on alignment between your skills and their research
     `;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    const responseText = response.text();
+    const emailText = response.text();
 
-    try {
-      const emailContent = JSON.parse(responseText);
-      if (!emailContent.subject || !emailContent.body) {
-        throw new Error("Invalid email content generated");
-      }
-      return emailContent;
-    } catch (e) {
-      console.error("Error parsing LLM response:", e);
-      // Fallback to basic format if JSON parsing fails
-      const lines = responseText.split("\n");
-      return {
-        subject:
-          lines[0] || `Research Collaboration Interest - ${resume.user?.name}`,
-        body:
-          lines.slice(1).join("\n") ||
-          `Dear Professor ${faculty.name},\n\nI am writing to express my interest in research collaboration opportunities...`,
-      };
-    }
+    // Split into subject and body
+    const [subject, ...bodyParts] = emailText.split("\n\n");
+
+    return {
+      subject: subject.trim(),
+      body: bodyParts.join("\n\n").trim(),
+    };
   } catch (error) {
     console.error("Error generating email:", error);
     throw error;
   }
-};
-
-export const filterFacultyByInterests = (faculty, interests) => {
-  return faculty.filter((f) =>
-    f.researchInterests.some((interest) =>
-      interests.some((i) => interest.toLowerCase().includes(i.toLowerCase()))
-    )
-  );
 };
 
 export const saveFacultyToDatabase = async (facultyList) => {

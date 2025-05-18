@@ -45,3 +45,47 @@ export const getExtraFindings = async (domains) => {
     throw error;
   }
 };
+
+export const generatePreviewEmails = async (resumeId, selectedFaculty) => {
+  try {
+    if (
+      !resumeId ||
+      !Array.isArray(selectedFaculty) ||
+      selectedFaculty.length === 0
+    ) {
+      throw new Error("Invalid input parameters");
+    }
+
+    const response = await axios.post(
+      `${API_ENDPOINTS.academic}/generate-preview-emails`,
+      {
+        resumeId,
+        selectedFaculty: selectedFaculty.map((faculty) => ({
+          _id: faculty._id,
+          name: faculty.name,
+          email: faculty.email,
+          department: faculty.department,
+          institution: faculty.institution,
+          researchInterests: faculty.researchInterests,
+        })),
+      }
+    );
+
+    if (!response.data?.emails) {
+      throw new Error("No email previews generated");
+    }
+
+    return response.data.emails.map((email) => ({
+      ...email,
+      facultyId: email.faculty._id,
+      recipient: email.faculty.email,
+    }));
+  } catch (error) {
+    console.error("Error generating email previews:", error);
+    throw new Error(
+      error.response?.data?.message ||
+        error.message ||
+        "Failed to generate email previews"
+    );
+  }
+};
