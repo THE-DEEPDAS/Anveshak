@@ -260,3 +260,16 @@ export const editEmail = async (emailId, { subject, body }) => {
     );
   }
 };
+
+export const updateEmail = async (emailId, updates) => {
+  try {
+    const response = await axios.put(
+      `${API_ENDPOINTS.emails}/${emailId}`,
+      updates
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error updating email:", error);
+    throw error;
+  }
+};

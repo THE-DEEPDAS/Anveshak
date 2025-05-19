@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getEmailById } from "../../services/emailService";
+import { getEmailById, updateEmail } from "../../services/emailService";
 import { format } from "date-fns";
 import {
   FaEnvelope,
@@ -11,6 +11,7 @@ import {
   FaBuilding,
   FaBriefcase,
   FaClock,
+  FaEdit,
 } from "react-icons/fa";
 import Button from "../ui/Button";
 
@@ -19,6 +20,10 @@ const EmailDetail = () => {
   const [email, setEmail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedSubject, setEditedSubject] = useState("");
+  const [editedBody, setEditedBody] = useState("");
+  const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -29,6 +34,8 @@ const EmailDetail = () => {
         setLoading(true);
         const fetchedEmail = await getEmailById(emailId);
         setEmail(fetchedEmail);
+        setEditedSubject(fetchedEmail.subject || "");
+        setEditedBody(fetchedEmail.body || "");
       } catch (err) {
         console.error("Error fetching email details:", err);
         setError("Failed to load email details");
@@ -68,6 +75,110 @@ const EmailDetail = () => {
   const formatDate = (dateStr) => {
     if (!dateStr) return "Not sent yet";
     return format(new Date(dateStr), "MMMM dd, yyyy 'at' h:mm a");
+  };
+
+  const formatTechStack = (techStack) => {
+    if (!techStack) return "No tech stack available";
+    if (typeof techStack === "string") return techStack;
+    if (typeof techStack === "object") {
+      const stack = Object.entries(techStack)
+        .filter(([_, values]) => Array.isArray(values) && values.length > 0)
+        .map(([category, values]) => `${category}: ${values.join(", ")}`)
+        .join("\n");
+      return stack || "No tech stack available";
+    }
+    return "No tech stack available";
+  };
+
+  // Initialize edit mode with current values
+  const startEditing = () => {
+    setEditedSubject(email.subject);
+    setEditedBody(email.body);
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setEditedSubject("");
+    setEditedBody("");
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      const updatedEmail = await updateEmail(emailId, {
+        subject: editedSubject,
+        body: editedBody,
+      });
+      setEmail(updatedEmail);
+      setIsEditing(false);
+      setSaving(false);
+    } catch (err) {
+      console.error("Error saving email:", err);
+      setError("Failed to save changes");
+      setSaving(false);
+    }
+  };
+
+  const renderEmailContent = () => {
+    if (isEditing) {
+      return (
+        <div className="space-y-4">
+          <div>
+            <label
+              htmlFor="subject"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Subject
+            </label>
+            <input
+              type="text"
+              id="subject"
+              value={editedSubject}
+              onChange={(e) => setEditedSubject(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="body"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Body
+            </label>
+            <textarea
+              id="body"
+              rows={15}
+              value={editedBody}
+              onChange={(e) => setEditedBody(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex justify-end space-x-3">
+            <Button
+              onClick={cancelEditing}
+              variant="secondary"
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleSave} loading={saving}>
+              Save Changes
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    // Regular view mode
+    return (
+      <div>
+        <h2 className="text-xl font-semibold mb-4">{email.subject}</h2>
+        <div className="whitespace-pre-wrap bg-white rounded-lg p-4 border">
+          {email.body}
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -132,14 +243,20 @@ const EmailDetail = () => {
         </Button>
 
         <div className="bg-white rounded-lg shadow-md p-8">
-          {/* Header */}
-          <div className="flex justify-between items-start mb-6">
+          {/* Header */}{" "}
+          <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-gray-800">
-              {email.subject}
+              {isEditing ? "Edit Email" : email.subject}
             </h1>
-            {getStatusBadge(email.status)}
+            <div className="flex items-center space-x-4">
+              {email.status === "draft" && !isEditing && (
+                <Button variant="secondary" onClick={startEditing}>
+                  <FaEdit className="mr-2" /> Edit Email
+                </Button>
+              )}
+              {getStatusBadge(email.status)}
+            </div>
           </div>
-
           {/* Metadata */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-gray-50 p-4 rounded-lg">
             <div className="flex items-center">
@@ -179,16 +296,69 @@ const EmailDetail = () => {
                 </p>
               </div>
             </div>
-          </div>
-
-          {/* Email Body */}
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold mb-2">Email Content</h2>
-            <div className="bg-gray-50 p-6 rounded-lg whitespace-pre-wrap font-mono text-gray-700">
-              {email.body}
+          </div>{" "}
+          {/* Email Content */}
+          {isEditing ? (
+            <div className="space-y-4 mb-8">
+              <div>
+                <label
+                  htmlFor="subject"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Subject
+                </label>
+                <input
+                  type="text"
+                  id="subject"
+                  value={editedSubject}
+                  onChange={(e) => setEditedSubject(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="Enter email subject..."
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="body"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Body
+                </label>
+                <textarea
+                  id="body"
+                  rows={15}
+                  value={editedBody}
+                  onChange={(e) => setEditedBody(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 font-mono"
+                  placeholder="Enter email body..."
+                />
+              </div>
+              <div className="flex justify-end space-x-3 pt-4">
+                <Button
+                  onClick={cancelEditing}
+                  variant="secondary"
+                  disabled={saving}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleSave} variant="primary" loading={saving}>
+                  Save Changes
+                </Button>
+              </div>
             </div>
-          </div>
-
+          ) : (
+            <div className="mb-8">
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold mb-2">Subject</h2>
+                <div className="bg-gray-50 p-4 rounded-lg">{email.subject}</div>
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold mb-2">Body</h2>
+                <div className="bg-gray-50 p-6 rounded-lg whitespace-pre-wrap font-mono text-gray-700">
+                  {email.body}
+                </div>
+              </div>
+            </div>
+          )}
           {/* Company Research (if available) */}
           {email.companyResearch &&
             Object.values(email.companyResearch).some((value) => value) && (
@@ -238,15 +408,14 @@ const EmailDetail = () => {
                       <h3 className="font-semibold text-gray-700">
                         Tech Stack
                       </h3>
-                      <p className="text-gray-600">
-                        {email.companyResearch.techStack}
-                      </p>
+                      <pre className="text-gray-600 whitespace-pre-wrap font-mono text-sm bg-white p-3 rounded border">
+                        {formatTechStack(email.companyResearch.techStack)}
+                      </pre>
                     </div>
                   )}
                 </div>
               </div>
             )}
-
           {email.status === "draft" && (
             <div className="flex justify-end">
               <Button variant="primary">Send Email</Button>

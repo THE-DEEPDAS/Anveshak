@@ -19,21 +19,31 @@ const CompanySelector = ({ companies, onCompaniesSelected }) => {
     }
   };
   const formatTechStack = (techStack) => {
-    if (!techStack) return "";
+    if (!techStack) return "No tech stack available";
     if (typeof techStack === "string") return techStack;
     if (typeof techStack === "object") {
-      let stack = [];
-      if (techStack.frontend) stack.push(...techStack.frontend);
-      if (techStack.backend) stack.push(...techStack.backend);
-      if (techStack.devops) stack.push(...techStack.devops);
-      if (techStack.other) stack.push(...techStack.other);
-      if (techStack.software) stack.push(...techStack.software);
-      if (techStack.hardware) stack.push(...techStack.hardware);
-      // Remove duplicates
-      stack = Array.from(new Set(stack));
-      return stack.join(", ");
+      const categories = [
+        "frontend",
+        "backend",
+        "devops",
+        "other",
+        "software",
+        "hardware",
+      ];
+      let displayStack = [];
+
+      for (const category of categories) {
+        if (
+          Array.isArray(techStack[category]) &&
+          techStack[category].length > 0
+        ) {
+          displayStack.push(`${category}: ${techStack[category].join(", ")}`);
+        }
+      }
+
+      return displayStack.join("\n") || "No tech stack available";
     }
-    return "";
+    return "No tech stack available";
   };
 
   return (
@@ -103,10 +113,10 @@ const CompanySelector = ({ companies, onCompaniesSelected }) => {
                   <div className="text-sm">
                     <span className="font-medium text-gray-700">
                       Tech Stack:{" "}
-                    </span>
-                    <span className="text-gray-600">
+                    </span>{" "}
+                    <pre className="text-gray-600 whitespace-pre-wrap font-mono text-sm bg-white p-2 rounded border">
                       {formatTechStack(company.research.techStack)}
-                    </span>
+                    </pre>
                   </div>
                 </>
               )}

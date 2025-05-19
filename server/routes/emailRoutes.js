@@ -573,4 +573,38 @@ router.put("/:id/edit", async (req, res) => {
   }
 });
 
+// Update email
+router.put("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { subject, body } = req.body;
+
+    if (!subject || !body) {
+      return res.status(400).json({ message: "Subject and body are required" });
+    }
+
+    const email = await Email.findById(id);
+    if (!email) {
+      return res.status(404).json({ message: "Email not found" });
+    }
+
+    // Only allow editing drafts
+    if (email.status !== "draft") {
+      return res
+        .status(400)
+        .json({ message: "Only draft emails can be edited" });
+    }
+
+    email.subject = subject;
+    email.body = body;
+    email.updatedAt = new Date();
+
+    await email.save();
+    return res.status(200).json(email);
+  } catch (error) {
+    console.error("Error updating email:", error);
+    return res.status(500).json({ message: "Error updating email" });
+  }
+});
+
 export default router;

@@ -4,7 +4,7 @@ import { useAppContext } from "../../context/AppContext";
 import { generateEmails } from "../../services/emailService";
 import CompanySelector from "./CompanySelector";
 import { useToast } from "../../components/ui/Toaster";
-import { FaSpinner } from "react-icons/fa";
+import { FaSpinner, FaEdit } from "react-icons/fa";
 
 const EmailGenerator = () => {
   const { resume } = useAppContext();
@@ -13,6 +13,9 @@ const EmailGenerator = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [step, setStep] = useState("find-companies");
+  const [editingEmail, setEditingEmail] = useState(null);
+  const [editedSubject, setEditedSubject] = useState("");
+  const [editedBody, setEditedBody] = useState("");
   const { showToast } = useToast();
 
   // Reset error when step changes
@@ -128,6 +131,31 @@ const EmailGenerator = () => {
     }
   };
 
+  const startEditing = (email) => {
+    setEditingEmail(email);
+    setEditedSubject(email.subject);
+    setEditedBody(email.body);
+  };
+
+  const cancelEditing = () => {
+    setEditingEmail(null);
+    setEditedSubject("");
+    setEditedBody("");
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingEmail) return;
+
+    const updatedEmails = generatedEmails.map((email) =>
+      email === editingEmail
+        ? { ...email, subject: editedSubject, body: editedBody }
+        : email
+    );
+    setGeneratedEmails(updatedEmails);
+    cancelEditing();
+    showToast("Email updated successfully", "success");
+  };
+
   const renderError = () => {
     if (!error) return null;
     return (
@@ -188,24 +216,79 @@ const EmailGenerator = () => {
                 key={index}
                 className="bg-gray-50 rounded-lg p-6 border border-gray-200"
               >
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="font-semibold text-gray-800">
-                      {email.company}
-                    </h3>
-                    <p className="text-gray-600 text-sm">{email.recipient}</p>
-                  </div>
-                </div>
-                <div className="mb-4">
-                  <p className="font-medium text-gray-700">Subject:</p>
-                  <p className="text-gray-800">{email.subject}</p>
-                </div>
-                <div>
-                  <p className="font-medium text-gray-700 mb-2">Body:</p>
-                  <div className="bg-white p-4 rounded border border-gray-200 whitespace-pre-wrap text-gray-800">
-                    {email.body}
-                  </div>
-                </div>
+                {editingEmail === email ? (
+                  <>
+                    <div className="mb-4">
+                      <h3 className="font-semibold text-gray-800">
+                        {email.company}
+                      </h3>
+                      <p className="text-gray-600 text-sm">{email.recipient}</p>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Subject
+                        </label>
+                        <input
+                          type="text"
+                          value={editedSubject}
+                          onChange={(e) => setEditedSubject(e.target.value)}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Body
+                        </label>
+                        <textarea
+                          rows={15}
+                          value={editedBody}
+                          onChange={(e) => setEditedBody(e.target.value)}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 font-mono"
+                        />
+                      </div>
+                      <div className="flex justify-end space-x-3 pt-4">
+                        <Button variant="secondary" onClick={cancelEditing}>
+                          Cancel
+                        </Button>
+                        <Button variant="primary" onClick={handleSaveEdit}>
+                          Save Changes
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="font-semibold text-gray-800">
+                          {email.company}
+                        </h3>
+                        <p className="text-gray-600 text-sm">
+                          {email.recipient}
+                        </p>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => startEditing(email)}
+                      >
+                        <FaEdit className="mr-1" />
+                        Edit
+                      </Button>
+                    </div>
+                    <div className="mb-4">
+                      <p className="font-medium text-gray-700">Subject:</p>
+                      <p className="text-gray-800">{email.subject}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-700 mb-2">Body:</p>
+                      <div className="bg-white p-4 rounded border border-gray-200 whitespace-pre-wrap text-gray-800 font-mono">
+                        {email.body}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
 
