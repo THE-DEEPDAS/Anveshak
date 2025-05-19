@@ -3,11 +3,7 @@ import * as cheerio from "cheerio";
 import { config } from "../config/config.js";
 import Faculty from "../models/Faculty.js";
 import Institution from "../models/Institution.js";
-import {
-  generateBetterEmailWithLLM,
-  genAI,
-  generateEmailContent,
-} from "./aiService.js";
+import { generateResearchEmail, genAI } from "./aiService.js";
 
 // Helper function to escape special regex characters
 function escapeRegExp(string) {
@@ -245,77 +241,67 @@ async function findFacultyWithLLM(input, keywords = []) {
       // Case 2: input is resume object and keywords array
       domainContext = keywords;
     }
+    const prompt = `[INSTRUCTION]
+You are an academic researcher finder. Find faculty members from top Indian institutions matching these criteria:
 
-    const prompt = `
-      Find relevant faculty members for research collaboration based on the following criteria:
-      
-      ${
-        Array.isArray(input)
-          ? `
-      RESEARCH DOMAINS:
-      ${JSON.stringify(domainContext, null, 2)}
-      `
-          : `
-      CANDIDATE BACKGROUND:
-      ${JSON.stringify(
+[INPUT]
+${
+  Array.isArray(input)
+    ? `RESEARCH DOMAINS:\n${JSON.stringify(domainContext, null, 2)}`
+    : `CANDIDATE PROFILE:\n${JSON.stringify(
         {
           skills: input.skills,
           interests: keywords,
           education: input.education,
-          experience: input.experience?.map((exp) => ({
-            title: exp.title,
-            description: exp.description,
+          experience: input.experience?.map(({ title, description }) => ({
+            title,
+            description,
           })),
-          projects: input.projects?.map((proj) => ({
-            title: proj.title,
-            description: proj.description,
+          projects: input.projects?.map(({ title, description }) => ({
+            title,
+            description,
           })),
         },
         null,
         2
-      )}
+      )}`
+}
 
-      SEARCH FOCUS:
-      - Research areas: ${keywords.join(", ")}
-      - Academic fields related to candidate's background
-      - Strong potential for collaboration
-      `
-      }
+[OUTPUT RULES]
+1. Return ONLY a valid JSON array of faculty profiles - NO explanations, NO markdown
+2. Each faculty member MUST be a real, active researcher
+3. Each object MUST have this exact structure:
+{
+  "name": "string (full name) REQUIRED",
+  "email": "string (valid .edu or .ac.in email) REQUIRED",
+  "department": "string (specific department name) REQUIRED",
+  "institution": "string (full institution name) REQUIRED",
+  "researchInterests": ["string array (3-5 specific research areas)"] REQUIRED,
+  "relevanceScore": number (0.1-1.0) REQUIRED
+}
 
-      TARGET INSTITUTIONS & DEPARTMENTS:
-      Primary Institutions:
-      1. IITs - Focus on research-active professors
-      2. IISc - Particularly robotics and AI labs
-      3. NITs - Professors with recent publications
-      4. DRDO - Research scientists in relevant areas
+[REQUIREMENTS]
+1. Generate 5- 10 highly relevant faculty profiles
+2. Only include faculty with verifiable .edu or .ac.in email addresses
+3. Research interests must align with ${
+      Array.isArray(input) ? "the provided domains" : "candidate's background"
+    }
+4. Focus on IIT, IISc, NIT or DRDO researchers
+5. Do not invent or hallucinate details
 
-      REQUIREMENTS:
-      1. Each faculty member MUST have:
-         - Full name
-         - Valid email address
-         - Department/field
-         - Research interests
-         - Institution details
-      2. Ensure research interests align with ${
-        Array.isArray(input) ? "specified domains" : "candidate's background"
-      }
-      3. Only include faculty actively conducting research
-      4. Focus on potential for meaningful collaboration
+[PENALTIES]
+- Invalid email formats will be rejected
+- Missing required fields will be rejected
+- Generic/vague research interests will be rejected
+- Made-up faculty members will be rejected
 
-      FORMAT:
-      Return a JSON array of faculty profiles:
-      {
-        "name": "string (full name)",
-        "email": "string (valid email)",
-        "department": "string",
-        "institution": {
-          "name": "string",
-          "location": "string"
-        },
-        "researchInterests": ["array of interests"],
-        "relevanceScore": number (0-1)
-      }
-    `;
+[RESPONSE FORMAT]
+[
+  {faculty1},
+  {faculty2},
+  {faculty3},
+  ... upto 10 faculty members
+]`;
 
     const result = await model.generateContent(prompt);
     const response = result.response.text();
@@ -334,26 +320,54 @@ async function findFacultyWithLLM(input, keywords = []) {
         .replace(/```json\s*|\s*```$/g, "")
         .replace(/\/\/.*$/gm, "")
         .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/,(\s*[}\]])/g, "$1");
+        .replace(/,(\s*[}\]])/g, "$1"); // Parse and validate faculty entries
+      let faculty;
+      try {
+        faculty = JSON.parse(jsonStr);
+      } catch (e) {
+        // Try to salvage partial JSON
+        const validJsonStr = jsonStr.replace(/}\s*{/g, "},{").trim();
+        if (validJsonStr.startsWith("[") && validJsonStr.endsWith("]")) {
+          try {
+            faculty = JSON.parse(validJsonStr);
+          } catch (e2) {
+            console.log("Could not salvage JSON:", e2);
+            return [];
+          }
+        } else {
+          return [];
+        }
+      }
 
-      // Parse and validate faculty entries
-      let faculty = JSON.parse(jsonStr);
       if (!Array.isArray(faculty)) {
         console.log("LLM response is not an array");
         return [];
       }
+      console.log("\nRaw LLM Response Sample:", response.slice(0, 500), "...");
+      console.log(
+        "\nParsed JSON Sample:",
+        JSON.stringify(faculty?.slice(0, 1), null, 2)
+      );
 
-      // Validate each faculty member
+      // Strict validation for each faculty member
       const validFaculty = faculty.filter((f) => {
         const isValid =
           f &&
           typeof f.name === "string" &&
           typeof f.email === "string" &&
-          f.email.includes("@") &&
+          (f.email.includes(".edu") || f.email.includes(".ac.in")) &&
           f.department &&
+          typeof f.department === "string" &&
           Array.isArray(f.researchInterests) &&
-          f.researchInterests.length > 0 &&
-          f.institution?.name;
+          f.researchInterests.length >= 3 &&
+          f.researchInterests.every(
+            (i) => typeof i === "string" && i.length > 5
+          ) &&
+          (typeof f.institution === "string" ||
+            (f.institution?.name && typeof f.institution.name === "string")) &&
+          typeof f.relevanceScore === "number" &&
+          f.relevanceScore >= 0 &&
+          f.relevanceScore <= 1;
 
         if (!isValid) {
           console.log(`Invalid faculty entry:`, f);
@@ -379,9 +393,14 @@ async function findFacultyWithLLM(input, keywords = []) {
           .lean();
 
         return dbFaculty.filter((f) => f && f.email && f.email.includes("@"));
-      }
-
-      return validFaculty;
+      } // Normalize the institution property
+      return validFaculty.map((f) => ({
+        ...f,
+        institution:
+          typeof f.institution === "string"
+            ? { name: f.institution }
+            : f.institution,
+      }));
     } catch (error) {
       console.error("Error parsing LLM faculty response:", error);
       return [];
@@ -442,17 +461,76 @@ export const searchFaculty = async (domains) => {
         ...faculty,
         matchScore: interestOverlap * 3 + publicationScore * 2 + projectScore,
       };
-    });
+    }); // Enhanced sorting and filtering of faculty matches    // Normalize faculty data before validation
+    const normalizedFaculty = processedFaculty.map((f) => ({
+      ...f,
+      // Normalize institution to always be an object
+      institution:
+        typeof f.institution === "string"
+          ? { name: f.institution }
+          : f.institution,
+      // Ensure research interests is always an array
+      researchInterests: Array.isArray(f.researchInterests)
+        ? f.researchInterests
+        : typeof f.researchInterests === "string"
+        ? [f.researchInterests]
+        : [],
+    }));
 
-    // Sort by match score and filter out low-matching faculty
-    const relevantFaculty = processedFaculty
-      .filter((f) => f.matchScore >= 3 && f.email) // Ensure email exists and good match
-      .sort((a, b) => b.matchScore - a.matchScore)
+    const relevantFaculty = normalizedFaculty
+      .filter((f) => {
+        // Must have email and basic match score
+        if (!f.email || !f.matchScore) {
+          return false;
+        }
+
+        // Less strict match score requirement
+        if (f.matchScore < 2) {
+          return false;
+        }
+
+        // Calculate match score based on available data
+        const matchScore = f.matchScore;
+        const hasValidResearchInterests =
+          Array.isArray(f.researchInterests) && f.researchInterests.length > 0;
+        const hasValidDepartment =
+          f.department && typeof f.department === "string";
+        const hasValidInstitution =
+          f.institution &&
+          (typeof f.institution === "string" || f.institution.name);
+
+        // At least one of research interests, department, or valid institution must be present
+        if (
+          !hasValidResearchInterests &&
+          !hasValidDepartment &&
+          !hasValidInstitution
+        ) {
+          return false;
+        }
+        // At least have basic contact info
+        if (!f.email || !f.name) {
+          return false;
+        }
+        f.deepMatchScore = matchScore;
+        return true;
+      })
+      .sort((a, b) => b.deepMatchScore - a.deepMatchScore)
       .slice(0, 10); // Limit to top 10 matches
+
+    console.log(`\nProcessing Summary:
+- Total faculty entries from LLM: ${processedFaculty.length}
+- Valid faculty entries after filtering: ${relevantFaculty.length}
+- Match scores range: ${Math.min(
+      ...relevantFaculty.map((f) => f.matchScore)
+    )} to ${Math.max(...relevantFaculty.map((f) => f.matchScore))}
+`);
 
     if (relevantFaculty.length > 0) {
       // Save results to database
       await saveFacultyToDatabase(relevantFaculty);
+      console.log(
+        `Successfully saved ${relevantFaculty.length} faculty profiles to database`
+      );
       return relevantFaculty;
     }
 
@@ -515,130 +593,6 @@ export const filterFacultyByInterests = (faculty, interests) => {
   });
 };
 
-/**
- * Generate a personalized email for a faculty member
- */
-export const generateBetterEmail = async (faculty, resume) => {
-  try {
-    // Input validation
-    if (!faculty || typeof faculty !== "object") {
-      throw new Error("Faculty data is required");
-    }
-
-    if (!resume || typeof resume !== "object") {
-      throw new Error("Resume data is required");
-    }
-
-    // Normalize the faculty data
-    const normalizedFaculty = {
-      name: faculty.name || faculty.fullName || "",
-      title: faculty.title || "Professor",
-      department: faculty.department || "Research",
-      institution: faculty.institution || {},
-      email: faculty.email || "",
-      researchInterests: Array.isArray(faculty.researchInterests)
-        ? faculty.researchInterests
-        : [],
-      publications: Array.isArray(faculty.publications)
-        ? faculty.publications
-        : [],
-      projects: Array.isArray(faculty.projects) ? faculty.projects : [],
-    };
-
-    // Normalize the resume data
-    const normalizedResume = {
-      user: resume.user || {},
-      education: Array.isArray(resume.education) ? resume.education : [],
-      experience: Array.isArray(resume.experience) ? resume.experience : [],
-      skills: Array.isArray(resume.skills) ? resume.skills : [],
-      projects: Array.isArray(resume.projects) ? resume.projects : [],
-      publications: Array.isArray(resume.publications)
-        ? resume.publications
-        : [],
-    };
-
-    // Find matching research interests
-    const matches = {
-      relevantSkills: normalizedResume.skills.filter((skill) =>
-        normalizedFaculty.researchInterests.some((interest) =>
-          skill.toLowerCase().includes(interest.toLowerCase())
-        )
-      ),
-      relevantExperience: normalizedResume.experience.filter((exp) =>
-        normalizedFaculty.researchInterests.some((interest) =>
-          exp.description?.toLowerCase().includes(interest.toLowerCase())
-        )
-      ),
-      relevantProjects: normalizedResume.projects.filter((project) =>
-        normalizedFaculty.researchInterests.some((interest) =>
-          project.description?.toLowerCase().includes(interest.toLowerCase())
-        )
-      ),
-    };
-
-    try {
-      // Try to generate email with AI
-      const emailContent = await generateBetterEmailWithLLM({
-        faculty: normalizedFaculty,
-        candidate: normalizedResume,
-        matches,
-      });
-
-      // Validate AI-generated content
-      if (emailContent?.subject && emailContent?.body) {
-        return emailContent;
-      }
-    } catch (aiError) {
-      console.error("Error generating email with AI:", aiError);
-    }
-
-    // Fallback to template-based email if AI fails
-    const fallbackSubject = `Research Opportunity Inquiry - ${
-      normalizedResume.user.name || "Prospective Student"
-    }`;
-    const fallbackBody = `Dear ${normalizedFaculty.title} ${
-      normalizedFaculty.name
-    },
-
-I am writing to express my strong interest in pursuing research opportunities in your lab at ${
-      normalizedFaculty.institution.name || "your institution"
-    }. Your work in ${normalizedFaculty.researchInterests.join(
-      ", "
-    )} aligns perfectly with my research interests and academic background.
-
-${
-  matches.relevantSkills.length > 0
-    ? `I have experience with ${matches.relevantSkills.join(
-        ", "
-      )}, which I believe would be valuable for your research projects.`
-    : ""
-}
-
-${
-  matches.relevantProjects.length > 0
-    ? `I have worked on relevant projects including: ${matches.relevantProjects
-        .map((p) => p.title)
-        .join(", ")}.`
-    : ""
-}
-
-I would greatly appreciate the opportunity to discuss potential research collaboration opportunities with you.
-
-Thank you for your time and consideration.
-
-Best regards,
-${normalizedResume.user.name || "Prospective Researcher"}`;
-
-    return {
-      subject: fallbackSubject,
-      body: fallbackBody,
-    };
-  } catch (error) {
-    console.error("Error in generateBetterEmail:", error);
-    throw error;
-  }
-};
-
 export const generateAcademicEmail = async (faculty, resume) => {
   if (!faculty || !resume) {
     throw new Error("Faculty and resume data are required");
@@ -679,90 +633,170 @@ export const generateAcademicEmail = async (faculty, resume) => {
       )
     );
     const prompt = `
-Generate a highly personalized academic email for research collaboration.
+Generate a highly personalized academic email for research collaboration. Make the email uniquely tailored to show understanding of the professor's work.
 
 FACULTY PROFILE:
-Name: Dr. ${faculty.name}
-Department: ${faculty.department || "Research"}
-Institution: ${faculty.institution?.name || ""}
+Professor: Dr. ${faculty.name}
+Title: ${faculty.title}
+Department: ${faculty.department}
+Institution: ${faculty.institution.name}
+Type: ${faculty.institution.type}
+Location: ${faculty.institution.location}
+Website: ${faculty.website || faculty.institution.website}
+
+RESEARCH BACKGROUND:
 Research Areas: ${faculty.researchInterests.join(", ")}
-
-CANDIDATE BACKGROUND:
-Education: ${
-      resume.education
-        ?.map((edu) => `${edu.degree} in ${edu.field} from ${edu.institution}`)
-        .join(", ") || ""
+Current Projects: ${
+      faculty.projects?.slice(0, 5).join("\n- ") || "Not available"
     }
-Relevant Skills: ${relevantSkills.join(", ")}
+
+Notable Publications:
 ${
-  relevantExperience.length > 0
-    ? `\nRelevant Experience:\n${relevantExperience
-        .map((exp) => `- ${exp.title} at ${exp.company}:\n  ${exp.description}`)
-        .join("\n")}`
-    : ""
+  faculty.publications
+    ?.slice(0, 3)
+    .map((pub) => `- ${pub}`)
+    .join("\n") || "Not available"
 }
+
+CANDIDATE HIGHLIGHTS:
+1. Research Interest Alignment:
+   ${faculty.researchInterests
+     .map((interest) => {
+       const matchingSkills = matches.relevantSkills.filter(
+         (skill) =>
+           skill.toLowerCase().includes(interest.toLowerCase()) ||
+           interest.toLowerCase().includes(skill.toLowerCase())
+       );
+       return `- ${interest}: Matching skills - ${matchingSkills.join(", ")}`;
+     })
+     .join("\n   ")}
+
+2. Relevant Projects:
+   ${matches.relevantProjects
+     .map(
+       (proj) =>
+         `- ${proj.title}
+      Description: ${proj.description}
+      Technical Skills: ${matches.relevantSkills
+        .filter((skill) =>
+          proj.description?.toLowerCase().includes(skill.toLowerCase())
+        )
+        .join(", ")}
+    `
+     )
+     .join("\n   ")}
+
+3. Professional Background:
+   ${relevantExperience
+     .map(
+       (exp) =>
+         `- ${exp.title} at ${exp.company}
+      Duration: ${exp.period}
+      Key Achievements: ${exp.description}
+      Research Relevance: ${exp.relevanceContext?.join(", ")}
+    `
+     )
+     .join("\n   ")}
+
+4. Academic Background:
+${resume.education
+  ?.map(
+    (edu) =>
+      `- ${edu.degree} in ${edu.field} (${edu.startDate} - ${edu.endDate})
+   Institution: ${edu.institution}
+   Performance: ${edu.score || "Not specified"}
+   Relevant Coursework: ${
+     edu.courses
+       ?.filter((course) =>
+         faculty.researchInterests.some((interest) =>
+           course.toLowerCase().includes(interest.toLowerCase())
+         )
+       )
+       .join(", ") || "Not specified"
+   }`
+  )
+  .join("\n")}
+
+5. Publications & Research:
 ${
-  relevantProjects.length > 0
-    ? `\nRelevant Projects:\n${relevantProjects
-        .map((proj) => `- ${proj.title}:\n  ${proj.description}`)
-        .join("\n")}`
-    : ""
-}      OUTPUT REQUIREMENTS:
-      1. Subject Line:
-         - Reference specific research area from faculty's interests
-         - Mention candidate's relevant expertise
-         - Include position type (PhD/Research)
+  resume.publications
+    ?.map(
+      (pub) =>
+        `- ${pub.title}
+   Venue: ${pub.venue}
+   Year: ${pub.year}
+   Relevance: ${pub.relevanceContext?.join(", ") || "General contribution"}`
+    )
+    .join("\n") || "No prior publications"
+}
 
-      2. Email Structure:
-         a) Opening Paragraph:
-            - Show deep understanding of their research
-            - Reference specific aspects of their work
-            - Draw connections to your interests
-            - Avoid generic statements
+EMAIL REQUIREMENTS:
 
-         b) Background Paragraph:
-            - Start with most relevant education/experience
-            - Highlight achievements in their research areas
-            - Focus on technical skills that match their work
-            - Include metrics or results where possible
+1. Subject Line (Format: [Research Area] - [Specific Position/Collaboration] - [Key Skill]):
+   - Must reference one of: ${faculty.researchInterests.join(", ")}
+   - Include position type (Research Intern/PhD/Collaboration)
+   - Highlight a relevant technical skill
 
-         c) Alignment & Goals:
-            - Explain why their specific lab/research
-            - Outline potential contributions
-            - Share research goals/aspirations
-            - Demonstrate long-term thinking
+2. Email Structure:
 
-         d) Closing:
-            - Clear call to action
-            - Offer to provide more information
-            - Express gratitude
-            - Professional signature
+   a) Opening (2-3 sentences):
+      - Reference specific faculty research/publication
+      - Show understanding of their current work
+      - Connect their work to your background
+      - Be specific and demonstrate research
 
-      3. Style Guidelines:
-         - Keep paragraphs focused and concise
-         - Use formal, academic tone
-         - Demonstrate enthusiasm without being overly casual
-         - Show respect and professionalism
+   b) Technical Alignment (1 paragraph):
+      - Lead with strongest matching skills
+      - Cite specific projects/achievements
+      - Use quantifiable results
+      - Connect each point to faculty's research
 
-      REQUIRED FORMAT:
-      {
-        "subject": "Subject line following the specified structure",
-        "body": "Email body with clear paragraph separation and professional signature",
-      }
+   c) Research Background (1 paragraph):
+      - Highlight relevant research experience
+      - Discuss methodology and results
+      - Connect to faculty's research areas
+      - Show research aptitude
 
-      VALIDATION CHECKS:
-      1. Subject must contain research area and position type
-      2. Opening must reference their specific research
-      3. Body must highlight relevant skills and experience
-      4. Must include specific collaboration interests
-      5. Clear call to action and professional closing
+   d) Academic Foundation (1 paragraph):
+      - Relevant coursework/achievements
+      - Technical skills development
+      - Research preparation
+      - Learning trajectory
 
-      Remember:
-      - Be genuine and specific
-      - Show you've done your research
-      - Focus on mutual research interests
-      - Maintain professionalism throughout
-    `;
+   e) Collaboration Interest (1-2 paragraphs):
+      - Specific research areas of interest
+      - Potential contributions
+      - Project ideas or extensions
+      - Long-term research goals
+
+   f) Professional Closing:
+      - Clear next steps
+      - Availability for discussion
+      - Reference to CV/portfolio
+      - Complete contact information
+
+3. Style Guide:
+   - Formal academic tone
+   - Specific and evidence-based
+   - Show enthusiasm appropriately
+   - Be concise and focused
+   - Avoid generic statements
+   - Use active voice
+   - Include specific examples
+
+FORMAT:
+{
+  "subject": "Research area - Position type - Key skill",
+  "body": "Dear Dr. [Name]...[Content following structure above]...Best regards, [Your name]"
+}
+
+VALIDATION REQUIREMENTS:
+1. Must reference at least one specific faculty publication/project
+2. Must connect candidate skills to faculty research
+3. Must include specific examples from candidate's background
+4. Must propose clear collaboration areas
+5. Must demonstrate understanding of faculty's work
+`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
@@ -824,33 +858,44 @@ ${
 
 export const saveFacultyToDatabase = async (facultyList) => {
   try {
+    let savedCount = 0;
     for (const faculty of facultyList) {
       // Skip invalid entries
       if (!faculty.name) continue;
 
-      // Try to find or create the institution first
+      console.log(`\nProcessing faculty member: ${faculty.name}`);
+      console.log(`Institution: ${faculty.institution?.name || "Unknown"}`);
+      console.log(`Department: ${faculty.department || "Unknown"}`);
+      console.log(
+        `Research Interests: ${
+          faculty.researchInterests?.join(", ") || "None"
+        }\n`
+      ); // Try to find or create the institution first
       let institution;
-      if (typeof faculty.institution === "string") {
-        // If institution is just a name string from LLM
+      const instName =
+        typeof faculty.institution === "string"
+          ? faculty.institution
+          : faculty.institution?.name;
+
+      if (instName) {
+        // Create or update the institution
         institution = await Institution.findOneAndUpdate(
-          { name: faculty.institution },
+          { name: instName },
           {
-            name: faculty.institution,
-            type: faculty.institution.includes("IIT")
+            name: instName,
+            type: instName.includes("IIT")
               ? "IIT"
-              : faculty.institution.includes("NIT")
+              : instName.includes("NIT")
               ? "NIT"
-              : faculty.institution.includes("IISc")
+              : instName.includes("IISc")
               ? "IISc"
-              : faculty.institution.includes("DRDO")
+              : instName.includes("DRDO")
               ? "DRDO"
               : "OTHER",
-            location: faculty.location || "India",
+            location: faculty.institution?.location || "India",
             website:
               faculty.website ||
-              `https://www.${faculty.institution
-                .toLowerCase()
-                .replace(/\s+/g, "")}.ac.in`,
+              `https://www.${instName.toLowerCase().replace(/\s+/g, "")}.ac.in`,
             departments: faculty.department ? [faculty.department] : [],
           },
           { upsert: true, new: true }
@@ -886,14 +931,23 @@ export const saveFacultyToDatabase = async (facultyList) => {
       if (faculty.email) {
         query.email = faculty.email;
         updateData.email = faculty.email;
-      }
-
-      // Now create or update the faculty member
-      await Faculty.findOneAndUpdate(query, updateData, {
+      } // Now create or update the faculty member
+      const result = await Faculty.findOneAndUpdate(query, updateData, {
         upsert: true,
         new: true,
       });
+
+      if (result) {
+        savedCount++;
+        console.log(`Successfully saved/updated faculty: ${faculty.name}`);
+      }
     }
+
+    console.log(`\nDatabase Summary:
+- Total faculty processed: ${facultyList.length}
+- Successfully saved/updated: ${savedCount}
+- Failed/Skipped: ${facultyList.length - savedCount}
+`);
   } catch (error) {
     console.error("Error saving faculty to database:", error);
     throw error;
@@ -902,136 +956,31 @@ export const saveFacultyToDatabase = async (facultyList) => {
 
 export const generateEmail = async (faculty, resume) => {
   try {
-    // Validate inputs
     if (!faculty || !resume) {
       throw new Error("Missing required parameters");
     }
 
-    // Find relevant skills
-    const relevantSkills =
-      resume.skills?.filter((skill) =>
-        faculty.researchInterests.some(
-          (interest) =>
-            skill.toLowerCase().includes(interest.toLowerCase()) ||
-            interest.toLowerCase().includes(skill.toLowerCase())
-        )
-      ) || [];
+    // Match the candidate's skills and background with the faculty's research interests
+    const matches = await matchCandidateToFaculty(resume, faculty);
 
-    // Find relevant experiences with detailed context
-    const relevantExperience =
-      resume.experience
-        ?.filter((exp) => {
-          const expDescription = exp.description?.toLowerCase() || "";
-          const expTitle = exp.title?.toLowerCase() || "";
-
-          return faculty.researchInterests.some((interest) => {
-            const interestLower = interest.toLowerCase();
-            return (
-              expDescription.includes(interestLower) ||
-              expTitle.includes(interestLower) ||
-              relevantSkills.some(
-                (skill) =>
-                  expDescription.includes(skill.toLowerCase()) ||
-                  expTitle.includes(skill.toLowerCase())
-              )
-            );
-          });
-        })
-        .map((exp) => ({
-          ...exp,
-          relevanceContext: faculty.researchInterests.filter(
-            (interest) =>
-              exp.description?.toLowerCase().includes(interest.toLowerCase()) ||
-              exp.title?.toLowerCase().includes(interest.toLowerCase())
-          ),
-        })) || [];
-
-    // Find relevant projects with detailed context
-    const relevantProjects =
-      resume.projects
-        ?.filter((project) => {
-          const projDescription = project.description?.toLowerCase() || "";
-          const projTitle = project.title?.toLowerCase() || "";
-
-          return faculty.researchInterests.some((interest) => {
-            const interestLower = interest.toLowerCase();
-            return (
-              projDescription.includes(interestLower) ||
-              projTitle.includes(interestLower) ||
-              relevantSkills.some(
-                (skill) =>
-                  projDescription.includes(skill.toLowerCase()) ||
-                  projTitle.includes(skill.toLowerCase())
-              )
-            );
-          });
-        })
-        .map((project) => ({
-          ...project,
-          relevanceContext: faculty.researchInterests.filter(
-            (interest) =>
-              project.description
-                ?.toLowerCase()
-                .includes(interest.toLowerCase()) ||
-              project.title?.toLowerCase().includes(interest.toLowerCase())
-          ),
-        })) || [];
-
-    // Extract publication matches if available
-    const relevantPublications =
-      faculty.publications?.filter(
-        (pub) =>
-          relevantSkills.some((skill) =>
-            pub.toLowerCase().includes(skill.toLowerCase())
-          ) ||
-          resume.skills?.some((skill) =>
-            pub.toLowerCase().includes(skill.toLowerCase())
-          )
-      ) || [];
-
-    const emailContext = {
-      faculty: {
-        name: faculty.name,
-        department: faculty.department,
-        institution: faculty.institution?.name || "",
-        researchAreas: faculty.researchInterests,
-        relevantPublications: relevantPublications.slice(0, 3),
-      },
+    // Generate email using improved research matching with proper object structure
+    const emailContent = await generateResearchEmail({
+      faculty,
       candidate: {
-        education: resume.education?.map((edu) => ({
-          degree: edu.degree,
-          field: edu.field,
-          institution: edu.institution,
-          period: `${edu.startDate} - ${edu.endDate}`,
-        })),
-        relevantSkills,
-        relevantExperience: relevantExperience.map((exp) => ({
-          title: exp.title,
-          company: exp.company,
-          period: `${exp.startDate} - ${exp.endDate}`,
-          description: exp.description,
-          relevance: exp.relevanceContext,
-        })),
-        relevantProjects: relevantProjects.map((proj) => ({
-          title: proj.title,
-          description: proj.description,
-          relevance: proj.relevanceContext,
-        })),
+        ...resume,
+        matches: matches,
       },
-    }; // Generate email using improved context
-    const emailContent = await generateBetterEmailWithLLM(emailContext);
+    });
 
-    // Check that we have both subject and body
+    // Validate output
     if (!emailContent || !emailContent.subject || !emailContent.body) {
       throw new Error("Generated email content is incomplete");
     }
 
-    const formattedEmail = {
+    return {
       subject: emailContent.subject.trim(),
       body: emailContent.body.trim(),
     };
-
-    return formattedEmail;
   } catch (error) {
     console.error("Error generating email:", error);
     throw error;
@@ -1190,10 +1139,193 @@ export const findRelevantFaculty = async (resume, filters = {}) => {
   }
 };
 
-function cleanEmailContent(text) {
-  return text
-    .replace(/```json[\s\S]*```/g, "") // Remove JSON code blocks
-    .replace(/\\n/g, "\n") // Replace escaped newlines
-    .replace(/\\"/g, '"') // Replace escaped quotes
-    .trim();
-}
+/**
+ * Generate a personalized email for a faculty member using strict validation
+ */
+export const generateBetterEmail = async (faculty, resume) => {
+  try {
+    // Validate and normalize faculty data
+    if (!faculty || typeof faculty !== "object") {
+      throw new Error("Invalid faculty data provided");
+    }
+
+    const normalizedFaculty = {
+      name: faculty.name?.trim(),
+      email: faculty.email?.trim(),
+      department: faculty.department?.trim() || "Research",
+      title: faculty.title?.trim() || "Professor",
+      institution: faculty.institution
+        ? {
+            name: faculty.institution.name?.trim(),
+            type: faculty.institution.type?.trim() || "University",
+            location: faculty.institution.location?.trim(),
+            website: faculty.institution.website?.trim(),
+          }
+        : null,
+      researchInterests: Array.isArray(faculty.researchInterests)
+        ? faculty.researchInterests
+            .filter(Boolean)
+            .map((interest) => interest.trim())
+        : [],
+      website: faculty.website?.trim(),
+      projects: Array.isArray(faculty.projects)
+        ? faculty.projects.filter(Boolean)
+        : [],
+      publications: Array.isArray(faculty.publications)
+        ? faculty.publications.filter(Boolean)
+        : [],
+    };
+
+    // Validate required faculty fields
+    if (!normalizedFaculty.name || !normalizedFaculty.email) {
+      throw new Error("Faculty name and email are required");
+    }
+    if (!normalizedFaculty.institution?.name) {
+      throw new Error("Faculty institution name is required");
+    }
+    if (normalizedFaculty.researchInterests.length === 0) {
+      throw new Error("Faculty must have at least one research interest");
+    }
+
+    // Normalize and validate resume data
+    if (!resume || typeof resume !== "object") {
+      throw new Error("Invalid resume data provided");
+    }
+
+    // Extract skills from either parseResults or direct skills array
+    const skills =
+      resume.parseResults?.length > 0
+        ? resume.parseResults[resume.parseResults.length - 1].skills || []
+        : resume.skills || [];
+
+    if (!Array.isArray(skills) || skills.length === 0) {
+      console.error(
+        "Resume skills not found:",
+        JSON.stringify({
+          resume: { skills, parseResults: resume.parseResults },
+        })
+      );
+      throw new Error("Resume must include skills");
+    }
+
+    const normalizedResume = {
+      skills: skills.filter(Boolean).map((skill) => skill.trim()),
+      experience: (resume.parseResults?.length > 0
+        ? resume.parseResults[resume.parseResults.length - 1].experience
+        : resume.experience || []
+      ).filter(Boolean),
+      projects: (resume.parseResults?.length > 0
+        ? resume.parseResults[resume.parseResults.length - 1].projects
+        : resume.projects || []
+      ).filter(Boolean),
+      education: Array.isArray(resume.education)
+        ? resume.education.filter((edu) => edu && edu.degree)
+        : [],
+    };
+
+    // Find matches between faculty research and candidate profile
+    const matches = {
+      matchingInterests: normalizedFaculty.researchInterests.filter(
+        (interest) =>
+          normalizedResume.skills.some(
+            (skill) =>
+              interest.toLowerCase().includes(skill.toLowerCase()) ||
+              skill.toLowerCase().includes(interest.toLowerCase())
+          )
+      ),
+      relevantProjects: normalizedResume.projects.filter((project) =>
+        normalizedFaculty.researchInterests.some((interest) =>
+          project.toLowerCase().includes(interest.toLowerCase())
+        )
+      ),
+      relevantSkills: normalizedResume.skills.filter((skill) =>
+        normalizedFaculty.researchInterests.some(
+          (interest) =>
+            interest.toLowerCase().includes(skill.toLowerCase()) ||
+            skill.toLowerCase().includes(interest.toLowerCase())
+        )
+      ),
+    };
+
+    // Generate email with validated and enriched data
+    const emailContent = await generateResearchEmail({
+      faculty: normalizedFaculty,
+      candidate: {
+        ...normalizedResume,
+        matches,
+      },
+    });
+
+    return emailContent;
+  } catch (error) {
+    console.error("Error in generateBetterEmail:", error);
+    throw error;
+  }
+};
+
+/**
+ * Matches a candidate's skills and background to a faculty member's research interests
+ * @param {Object} candidate - Contains skills, experience, projects, education
+ * @param {Object} faculty - Faculty member details with research interests
+ * @returns {Object} - Matching interests, relevant projects, and relevant skills
+ */
+export const matchCandidateToFaculty = async (candidate, faculty) => {
+  try {
+    // Ensure we have the required data
+    if (!candidate || !faculty) {
+      throw new Error("Missing candidate or faculty data for matching");
+    }
+
+    // Normalize candidate data
+    const candidateSkills = Array.isArray(candidate.skills)
+      ? candidate.skills
+      : [];
+    const candidateProjects = Array.isArray(candidate.projects)
+      ? candidate.projects
+      : [];
+
+    // Normalize faculty data
+    const facultyInterests = Array.isArray(faculty.researchInterests)
+      ? faculty.researchInterests
+      : [];
+
+    // Find matching interests (case-insensitive)
+    const matchingInterests = facultyInterests.filter((interest) =>
+      candidateSkills.some(
+        (skill) =>
+          skill.toLowerCase().includes(interest.toLowerCase()) ||
+          interest.toLowerCase().includes(skill.toLowerCase())
+      )
+    );
+
+    // Find relevant projects based on faculty interests
+    const relevantProjects = candidateProjects.filter((project) =>
+      facultyInterests.some((interest) =>
+        project.toLowerCase().includes(interest.toLowerCase())
+      )
+    );
+
+    // Find relevant skills based on faculty interests
+    const relevantSkills = candidateSkills.filter((skill) =>
+      facultyInterests.some(
+        (interest) =>
+          skill.toLowerCase().includes(interest.toLowerCase()) ||
+          interest.toLowerCase().includes(skill.toLowerCase())
+      )
+    );
+
+    return {
+      matchingInterests,
+      relevantProjects,
+      relevantSkills,
+    };
+  } catch (error) {
+    console.error("Error matching candidate to faculty:", error);
+    // Return empty arrays as fallback
+    return {
+      matchingInterests: [],
+      relevantProjects: [],
+      relevantSkills: [],
+    };
+  }
+};

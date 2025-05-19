@@ -32,12 +32,6 @@ const facultySchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
-  publications: [
-    {
-      type: String,
-      trim: true,
-    },
-  ],
   projects: [
     {
       type: String,

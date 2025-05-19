@@ -8,6 +8,7 @@ import {
 import { sendEmail } from "../services/emailService.js";
 import Email from "../models/Email.js";
 import Resume from "../models/Resume.js";
+import Faculty from "../models/Faculty.js";
 
 const router = express.Router();
 
@@ -26,40 +27,101 @@ router.post("/generate-preview-emails", async (req, res) => {
       return res.status(400).json({
         message: "Resume ID and selected faculty array are required",
       });
-    } // Get resume data
-    const resume = await Resume.findById(resumeId);
+    }
+
+    // Get resume data with populated fields
+    const resume = await Resume.findById(resumeId)
+      .populate({
+        path: "user",
+        select: "name email education github linkedin website",
+      })
+      .populate("education")
+      .populate("experience")
+      .populate("projects")
+      .exec();
+
     if (!resume) {
       return res.status(404).json({ message: "Resume not found" });
-    } // Education is optional
+    }
+
+    if (!resume.user?.name) {
+      return res.status(400).json({
+        message: "Resume must have associated user data with a name",
+      });
+    }
+
+    // Get full faculty data including publications and projects for each faculty member
+    const populatedFaculty = await Promise.all(
+      selectedFaculty.map(async (faculty) => {
+        const dbFaculty = await Faculty.findOne({
+          email: faculty.email,
+          name: faculty.name,
+        })
+          .populate("institution")
+          .lean();
+
+        return dbFaculty || faculty; // Fall back to provided data if not found in DB
+      })
+    );
 
     // Validate and normalize all faculty data
-    const invalidFaculty = [];
-    const normalizedFaculty = selectedFaculty
+    const invalidFaculty = []; // Create a validated faculty object with all available data
+    const normalizedFaculty = populatedFaculty
       .map((faculty) => {
-        if (!faculty.email || typeof faculty.email !== "string") {
+        // Skip invalid entries
+        if (!faculty?.email || typeof faculty.email !== "string") {
           invalidFaculty.push(faculty);
           return null;
         }
 
-        // Create a validated faculty object with defaults for missing fields
-        return {
-          ...faculty,
-          name: faculty.name || faculty.fullName || "Professor",
-          department: faculty.department || "Research",
-          researchInterests:
-            Array.isArray(faculty.researchInterests) ||
-            faculty.researchInterests instanceof Set
-              ? faculty.researchInterests
-              : [],
-          institution: faculty.institution || { name: "Unknown Institution" },
+        // Normalize and validate faculty data
+        const normalized = {
+          _id: faculty._id,
+          name: faculty.name?.trim() || faculty.fullName?.trim() || "Professor",
           email: faculty.email.trim(),
-          title: faculty.title || "Professor",
-          publications:
-            Array.isArray(faculty.publications) ||
-            faculty.publications instanceof Set
-              ? faculty.publications
-              : [],
+          department: faculty.department?.trim() || "Research",
+          title: faculty.title?.trim() || "Professor",
+          researchInterests: Array.isArray(faculty.researchInterests)
+            ? faculty.researchInterests
+                .filter((i) => i && typeof i === "string")
+                .map((i) => i.trim())
+            : [],
+          projects: Array.isArray(faculty.projects)
+            ? faculty.projects.filter(
+                (p) =>
+                  (p && typeof p === "string") ||
+                  (typeof p === "object" && p.title)
+              )
+            : [],
+          website: faculty.website?.trim() || faculty.portfolio?.trim() || "",
+          institution: faculty.institution
+            ? typeof faculty.institution === "string"
+              ? { name: faculty.institution.trim() }
+              : {
+                  name:
+                    faculty.institution.name?.trim() || "Unknown Institution",
+                  type: faculty.institution.type?.trim() || "University",
+                  location: faculty.institution.location?.trim() || "India",
+                }
+            : { name: "Unknown Institution" },
         };
+
+        // Validate required fields
+        if (!normalized.name || normalized.name === "Professor") {
+          console.warn(
+            `Missing name for faculty with email ${normalized.email}`
+          );
+          invalidFaculty.push(faculty);
+          return null;
+        }
+
+        if (normalized.researchInterests.length === 0) {
+          console.warn(`No research interests for faculty ${normalized.name}`);
+          invalidFaculty.push(faculty);
+          return null;
+        }
+
+        return normalized;
       })
       .filter((f) => f !== null);
 
@@ -68,10 +130,10 @@ router.post("/generate-preview-emails", async (req, res) => {
         message: "Some faculty members have invalid or missing email addresses",
         invalidFaculty: invalidFaculty.map((f) => f.name || "Unknown"),
       });
-    } // Find matching skills and experience
-    const relevantSkills = resume.skills || [];
-    const relevantExperience = resume.experience || [];
-    const relevantProjects = resume.projects || [];
+    } // Find matching skills and experience from resume
+    const candidateSkills = resume.skills || [];
+    const candidateExperience = resume.experience || [];
+    const candidateProjects = resume.projects || [];
 
     // Generate emails for each faculty member
     const emails = [];
@@ -79,7 +141,7 @@ router.post("/generate-preview-emails", async (req, res) => {
     for (const faculty of normalizedFaculty) {
       try {
         // Find matches between faculty interests and candidate background
-        const matchingSkills = relevantSkills.filter((skill) =>
+        const matchingSkills = candidateSkills.filter((skill) =>
           faculty.researchInterests?.some(
             (interest) =>
               interest.toLowerCase().includes(skill.toLowerCase()) ||
@@ -87,7 +149,7 @@ router.post("/generate-preview-emails", async (req, res) => {
           )
         );
 
-        const matchingExperience = relevantExperience.filter((exp) =>
+        const matchingExperience = candidateExperience.filter((exp) =>
           faculty.researchInterests?.some(
             (interest) =>
               exp.description?.toLowerCase().includes(interest.toLowerCase()) ||
@@ -97,7 +159,7 @@ router.post("/generate-preview-emails", async (req, res) => {
           )
         );
 
-        const matchingProjects = relevantProjects.filter((proj) =>
+        const matchingProjects = candidateProjects.filter((proj) =>
           faculty.researchInterests?.some(
             (interest) =>
               proj.description
@@ -132,11 +194,56 @@ router.post("/generate-preview-emails", async (req, res) => {
               validatedFaculty.name || "unknown faculty"
             }`
           );
-        }
+        } // Find matching faculty projects
+        const facultyRelevantProjects =
+          faculty.projects?.filter((proj) =>
+            validatedFaculty.researchInterests.some((interest) =>
+              proj.toLowerCase().includes(interest.toLowerCase())
+            )
+          ) || []; // Create enriched faculty object with all relevant data
+        const enrichedFaculty = {
+          name: validatedFaculty.name,
+          department: validatedFaculty.department,
+          researchInterests: validatedFaculty.researchInterests,
+          email: validatedFaculty.email,
+          title: validatedFaculty.title,
+          projects: facultyRelevantProjects,
+          website: faculty.website || faculty.portfolio || "",
+          institution: {
+            name: faculty.institution?.name || "Unknown Institution",
+            type: faculty.institution?.type || "University",
+            location: faculty.institution?.location || "India",
+          },
+        }; // Prepare enriched resume data with user info
+        const enrichedResume = {
+          ...resume.toObject(), // Convert mongoose document to plain object
+          skills:
+            resume.parseResults?.length > 0
+              ? resume.parseResults[resume.parseResults.length - 1].skills || []
+              : resume.skills || [],
+          experience:
+            resume.parseResults?.length > 0
+              ? resume.parseResults[resume.parseResults.length - 1]
+                  .experience || []
+              : resume.experience || [],
+          projects:
+            resume.parseResults?.length > 0
+              ? resume.parseResults[resume.parseResults.length - 1].projects ||
+                []
+              : resume.projects || [],
+          education: resume.education || [],
+          user: {
+            name: resume.user?.name || "",
+            email: resume.user?.email || "",
+          },
+          matchingSkills,
+          matchingExperience,
+          matchingProjects,
+        };
 
         const emailContent = await generateBetterEmail(
-          validatedFaculty,
-          resume
+          enrichedFaculty,
+          enrichedResume
         );
 
         if (!emailContent || !emailContent.subject || !emailContent.body) {
