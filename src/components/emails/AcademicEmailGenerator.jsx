@@ -174,19 +174,13 @@ const AcademicEmailGenerator = () => {
       setIsLoading(false);
     }
   };
-
+  // Simplified selection - only one faculty at a time
   const toggleFacultySelection = (facultyMember) => {
     if (!facultyMember.email) {
       showToast("Faculty member must have an email address", "error");
       return;
     }
-    setSelectedFaculty((prev) => {
-      const isSelected = prev.some((f) => f._id === facultyMember._id);
-      if (isSelected) {
-        return prev.filter((f) => f._id !== facultyMember._id);
-      }
-      return [...prev, facultyMember];
-    });
+    setSelectedFaculty([facultyMember]); // Replace entire selection with single faculty member
   };
   const handleFacultySelect = (facultyId) => {
     const selectedFacultyMember = faculty.find((f) => f._id === facultyId);
@@ -195,27 +189,9 @@ const AcademicEmailGenerator = () => {
     if (!selectedFacultyMember.email) {
       showToast("Faculty member must have an email address", "error");
       return;
-    }
-
-    setSelectedFacultyIds((prev) => {
-      const newSelection = new Set(prev);
-      if (newSelection.has(facultyId)) {
-        newSelection.delete(facultyId);
-      } else {
-        // Only allow one selection at a time
-        newSelection.clear();
-        newSelection.add(facultyId);
-      }
-      return newSelection;
-    });
-
-    // Update selectedFaculty to match selectedFacultyIds
-    setSelectedFaculty((prev) => {
-      if (prev.some((f) => f._id === facultyId)) {
-        return prev.filter((f) => f._id !== facultyId);
-      }
-      return [selectedFacultyMember];
-    });
+    } // Single selection mode
+    setSelectedFacultyIds(new Set([facultyId])); // Single selection - directly set to the selected faculty member
+    setSelectedFaculty([selectedFacultyMember]);
   };
 
   const renderFacultyList = () => {

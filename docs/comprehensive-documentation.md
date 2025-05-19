@@ -1,19 +1,7 @@
-# Cold Mailer
-
-A platform designed to help job seekers generate personalized cold emails to potential employers based on their resume and skills.
-
-## Features
-
-- Resume parsing and analysis
-- AI-powered company matching based on skills and experience
-- Personalized cold email generation with company research
-- Email sending and tracking
-- Email history and metrics visualization
-- Multiple domain support
-
 # Cold Mailer - Comprehensive Documentation
 
 ## Table of Contents
+
 1. [Introduction](#introduction)
 2. [Architecture Overview](#architecture-overview)
 3. [Core Technologies](#core-technologies)
@@ -39,6 +27,7 @@ A platform designed to help job seekers generate personalized cold emails to pot
 Cold Mailer is a comprehensive platform designed to help job seekers generate personalized cold emails to potential employers and academic faculty. The system combines AI-powered resume parsing, company/faculty research, and personalized email generation to create highly tailored outreach communications.
 
 The platform serves two primary use cases:
+
 - **Job application emails** - Matching candidates with companies based on skills and generating personalized job inquiry emails
 - **Academic collaboration emails** - Connecting students with faculty members for research opportunities based on matching interests
 
@@ -88,11 +77,13 @@ Cold Mailer implements three distinct resume parsing algorithms, each with its o
 #### 1. Simplified Parser (simplifiedResumeParser.js)
 
 A lightweight, rule-based parser optimized for extracting core information:
+
 - Skills
 - Experience
 - Projects
 
 **Algorithm Overview:**
+
 1. Extract text from PDF using pdf-parse
 2. Apply regex pattern matching to identify section headers
 3. Extract content between known section headers
@@ -100,29 +91,31 @@ A lightweight, rule-based parser optimized for extracting core information:
 5. Apply heuristics to identify skills, experiences, and projects
 
 **Key Features:**
+
 - Low computational overhead
 - No external API dependencies
 - Fast processing time
 - Domain-specific pattern matching for technical resumes
 
 **Code Implementation:**
+
 ```javascript
 async function parseResumeText(pdfBuffer) {
   // Extract text from PDF
   const rawText = await extractTextFromPdf(pdfBuffer);
-  
+
   // Identify sections using headers
   const sections = identifySections(rawText);
-  
+
   // Extract data from each section
   const skills = extractSkills(sections.skills);
   const experience = extractExperience(sections.experience);
   const projects = extractProjects(sections.projects);
-  
+
   return {
     skills,
     experience,
-    projects
+    projects,
   };
 }
 ```
@@ -132,18 +125,21 @@ async function parseResumeText(pdfBuffer) {
 A sophisticated parser based on the OpenResume algorithm that provides more accurate and detailed extraction:
 
 **Algorithm Overview:**
+
 1. Extract text items from PDF with position data using pdf.js
 2. Group text items into lines based on Y-coordinates
 3. Group lines into sections using font sizes and formatting patterns
 4. Apply specialized parsing rules to each identified section
 
 **Key Features:**
+
 - Preserves formatting and structure
 - Handles complex resume layouts
 - Extracts rich metadata including dates, positions, achievements
 - Better at identifying hierarchical information
 
 **Advantages:**
+
 - More accurate section detection
 - Better at handling multi-column layouts
 - Preserves chronological ordering
@@ -154,23 +150,27 @@ A sophisticated parser based on the OpenResume algorithm that provides more accu
 Uses Google's Gemini models to extract and structure resume data through natural language understanding:
 
 **Algorithm Overview:**
+
 1. Send PDF text to Gemini API with structured extraction prompts
 2. Process model responses to extract specific resume components
 3. Structure and validate the extracted information
 
 **Key Features:**
+
 - Superior understanding of context and semantics
 - Handles non-standard formats and language variations
 - Categorizes skills by type automatically
 - Identifies achievements and quantitative results
 
 **Benefits:**
+
 - Most accurate for diverse resume formats
 - Best at understanding implied skills and qualifications
 - Provides richer semantic categorization
 - Handles international and varied resume styles
 
 **Sample Prompt Structure:**
+
 ```javascript
 const prompt = `
   Extract all technical skills from the following resume text.
@@ -189,6 +189,7 @@ Cold Mailer utilizes generative AI to produce personalized email content with se
 #### 1. Company Research Email Generation
 
 **Algorithm Overview:**
+
 1. Process company information and candidate resume data
 2. Create a structured context object with key matching points
 3. Generate a prompt that emphasizes personalization and authentic connection
@@ -196,12 +197,14 @@ Cold Mailer utilizes generative AI to produce personalized email content with se
 5. Parse and validate the generated response for structure and personalization
 
 **Key Features:**
+
 - Company-specific research integration
 - Role-appropriate technical language
 - Quantified achievements matching
 - Multiple fallback methods for resilience
 
 **Implementation Highlights:**
+
 ```javascript
 export const generateEmailContent = async ({
   userName,
@@ -211,17 +214,23 @@ export const generateEmailContent = async ({
   skills,
   experience,
   projects,
-  companyResearch
+  companyResearch,
 }) => {
   // Structure context for generation
   const context = {
-    candidate: { name: userName, email: userEmail, skills, experience, projects },
-    company: { name: company, role, research: companyResearch }
+    candidate: {
+      name: userName,
+      email: userEmail,
+      skills,
+      experience,
+      projects,
+    },
+    company: { name: company, role, research: companyResearch },
   };
-  
+
   // Generate focused prompt
   const prompt = buildPersonalizedPrompt(context);
-  
+
   // Generate content with specific parameters
   const result = await model.generateContent({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -238,10 +247,10 @@ export const generateEmailContent = async ({
       },
     ],
   });
-  
+
   // Parse and structure the response
   return parseEmailResponse(result);
-}
+};
 ```
 
 #### 2. Academic Research Email Generation
@@ -249,6 +258,7 @@ export const generateEmailContent = async ({
 Specialized algorithm for generating personalized academic research collaboration emails:
 
 **Algorithm Overview:**
+
 1. Extract faculty research interests, publications, and academic background
 2. Match candidate skills and experience to faculty research areas
 3. Generate academically appropriate, research-focused email content
@@ -256,6 +266,7 @@ Specialized algorithm for generating personalized academic research collaboratio
 5. Format according to academic correspondence conventions
 
 **Key Features:**
+
 - Research-specific terminology
 - Publication reference integration
 - Academic institutional knowledge
@@ -266,6 +277,7 @@ Specialized algorithm for generating personalized academic research collaboratio
 Cold Mailer implements a robust company matching system to connect candidates with relevant employers:
 
 **Algorithm Overview:**
+
 1. Extract key skills and experience from candidate resume
 2. Execute multi-source company search:
    - Database search for exact and fuzzy skill matches
@@ -275,6 +287,7 @@ Cold Mailer implements a robust company matching system to connect candidates wi
 4. Enrich company profiles with additional research
 
 **Key Features:**
+
 - Multiple data sources for company matching
 - Weighted skill relevance scoring
 - Technology stack compatibility analysis
@@ -285,6 +298,7 @@ Cold Mailer implements a robust company matching system to connect candidates wi
 Specialized algorithm for matching candidates with academic faculty:
 
 **Algorithm Overview:**
+
 1. Extract academic interests and research experience from resume
 2. Search faculty database using domain-specific matching criteria
 3. Enrich results with web scraping from university websites
@@ -292,6 +306,7 @@ Specialized algorithm for matching candidates with academic faculty:
 5. Generate potential collaboration opportunities
 
 **Key Features:**
+
 - Research interest semantic matching
 - Publication relevance analysis
 - Institution type filtering
@@ -311,6 +326,7 @@ Cold Mailer provides comprehensive resume analysis features:
 - **Technology Categorization**: Classifies skills by type (languages, frameworks, tools)
 
 **Usage:**
+
 1. Upload PDF resume through the web interface or API
 2. System automatically processes and analyzes the document
 3. Review extracted information with confidence scores
@@ -329,6 +345,7 @@ Cold Mailer identifies relevant companies based on candidate skills:
 - **Relevance Scoring**: Ranks companies by match quality for targeting
 
 **Usage:**
+
 1. System analyzes candidate's skills and desired roles
 2. Matches are presented with relevance scores and research information
 3. User can select target companies for email generation
@@ -347,6 +364,7 @@ Cold Mailer generates personalized cold emails for job applications:
 - **Merge Fields**: Automatic insertion of personalized information
 
 **Usage:**
+
 1. Select target companies from match results
 2. Generate personalized email drafts for each company
 3. Review and edit generated content if desired
@@ -365,6 +383,7 @@ Cold Mailer generates personalized emails for academic research collaboration:
 - **Academic Background Integration**: Highlights relevant coursework and research experience
 
 **Usage:**
+
 1. Search for faculty members by research interest or institution
 2. Select target faculty members for outreach
 3. Generate personalized academic emails highlighting research alignment
@@ -384,6 +403,7 @@ Cold Mailer provides comprehensive email campaign management:
 - **Response Handling**: Assists with response management and follow-up
 
 **Usage:**
+
 1. Access email history from dashboard
 2. Filter and sort by various criteria (date, status, company)
 3. View detailed metrics and performance analytics
@@ -397,6 +417,7 @@ Cold Mailer provides comprehensive email campaign management:
 #### Authentication API
 
 **POST /api/auth/register**
+
 - Register a new user
 - Parameters:
   - `name` (string): User's full name
@@ -405,6 +426,7 @@ Cold Mailer provides comprehensive email campaign management:
 - Response: User object with authentication token
 
 **POST /api/auth/login**
+
 - Log in an existing user
 - Parameters:
   - `email` (string): User's email address
@@ -412,18 +434,21 @@ Cold Mailer provides comprehensive email campaign management:
 - Response: User object with authentication token
 
 **POST /api/auth/verify**
+
 - Verify user email
 - Parameters:
   - `token` (string): Email verification token
 - Response: Verification success status
 
 **POST /api/auth/reset-password-request**
+
 - Request a password reset
 - Parameters:
   - `email` (string): User's email address
 - Response: Request status
 
 **POST /api/auth/reset-password**
+
 - Reset user password
 - Parameters:
   - `token` (string): Password reset token
@@ -433,6 +458,7 @@ Cold Mailer provides comprehensive email campaign management:
 #### Resume API
 
 **POST /api/resumes/upload**
+
 - Upload and parse a resume
 - Authentication: Required
 - Parameters:
@@ -440,11 +466,13 @@ Cold Mailer provides comprehensive email campaign management:
 - Response: Parsed resume data
 
 **GET /api/resumes/:id**
+
 - Get resume data by ID
 - Authentication: Required
 - Response: Complete resume data
 
 **PUT /api/resumes/:id**
+
 - Update resume data
 - Authentication: Required
 - Parameters:
@@ -454,6 +482,7 @@ Cold Mailer provides comprehensive email campaign management:
 #### Email Generation API
 
 **POST /api/emails/generate**
+
 - Generate personalized emails
 - Authentication: Required
 - Parameters:
@@ -463,6 +492,7 @@ Cold Mailer provides comprehensive email campaign management:
 - Response: Generated email content or company matches
 
 **POST /api/academic/search-and-email**
+
 - Search for academic faculty and generate emails
 - Authentication: Required
 - Parameters:
@@ -470,6 +500,7 @@ Cold Mailer provides comprehensive email campaign management:
 - Response: Faculty list
 
 **POST /api/academic/generate-preview-emails**
+
 - Generate preview emails for selected faculty
 - Authentication: Required
 - Parameters:
@@ -480,11 +511,13 @@ Cold Mailer provides comprehensive email campaign management:
 ### Protected API Endpoints
 
 **GET /api/emails/user/:userId**
+
 - Get all emails for a user
 - Authentication: Required (Admin or Owner)
 - Response: Email records for user
 
 **POST /api/emails/send**
+
 - Send emails from drafts
 - Authentication: Required
 - Parameters:
@@ -492,6 +525,7 @@ Cold Mailer provides comprehensive email campaign management:
 - Response: Send status
 
 **GET /api/users/me**
+
 - Get current user profile
 - Authentication: Required
 - Response: User profile data
@@ -503,6 +537,7 @@ Cold Mailer provides comprehensive email campaign management:
 Cold Mailer implements robust error handling for JSON parsing in AI responses:
 
 **Key Features:**
+
 - **Enhanced JSON Validation**: Comprehensive validation for JSON structure
 - **Balanced Braces Check**: Ensures JSON has matching opening and closing braces
 - **Advanced JSON Repair**: Fixes common issues in malformed JSON responses
@@ -510,15 +545,16 @@ Cold Mailer implements robust error handling for JSON parsing in AI responses:
 - **Pattern Matching Extraction**: Uses regex to extract content when JSON parsing fails
 
 **Implementation:**
+
 ```javascript
 // First attempt standard parsing with repair
 try {
   emailContent = JSON.parse(fixedJson);
 } catch (innerParseError) {
   // Second attempt: extract JSON object bounds
-  const jsonStartIndex = fixedJson.indexOf('{');
-  const jsonEndIndex = fixedJson.lastIndexOf('}') + 1;
-  
+  const jsonStartIndex = fixedJson.indexOf("{");
+  const jsonEndIndex = fixedJson.lastIndexOf("}") + 1;
+
   if (jsonStartIndex !== -1 && jsonEndIndex > jsonStartIndex) {
     const extractedJson = fixedJson.substring(jsonStartIndex, jsonEndIndex);
     emailContent = JSON.parse(extractedJson);
@@ -526,11 +562,11 @@ try {
     // Third attempt: regex extraction for email components
     const subjectMatch = text.match(/"subject"\s*:\s*"([^"]+)"/);
     const bodyMatch = text.match(/"body"\s*:\s*"([\s\S]+?)(?:"\s*}|\s*"\s*$)/);
-    
+
     if (subjectMatch && bodyMatch) {
       emailContent = {
         subject: subjectMatch[1].trim(),
-        body: bodyMatch[1].trim()
+        body: bodyMatch[1].trim(),
       };
     }
   }
