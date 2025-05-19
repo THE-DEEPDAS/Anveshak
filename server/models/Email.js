@@ -68,6 +68,10 @@ const emailSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  hasResponse: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 // Update timestamps before saving

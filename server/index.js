@@ -22,6 +22,7 @@ import emailRoutes from "./routes/emailRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import academicRoutes from "./routes/academicRoutes.js";
+import statsRoutes from "./routes/statsRoutes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -122,6 +123,7 @@ app.use("/api/resumes", resumeRoutes);
 app.use("/api/emails", emailRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/academic", academicRoutes);
+app.use("/api/stats", statsRoutes);
 
 // Database connection
 mongoose
