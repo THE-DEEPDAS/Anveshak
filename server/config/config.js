@@ -23,6 +23,7 @@ const validateConfig = () => {
   const requiredEnvVars = [
     "MONGODB_URI",
     "JWT_SECRET",
+    "GEMINI_API_KEY",
     [
       "CLOUDINARY_URL",
       ["CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET"],

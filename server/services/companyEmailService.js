@@ -9,9 +9,31 @@ function escapeRegExp(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-const findCompaniesWithLLM = async (skills, role) => {
-  if (!process.env.GEMINI_API_KEY) return [];
+const logLLMResponse = (responseText, companies) => {
+  console.log("\n=== LLM Response Debug ===");
+  console.log("Raw response length:", responseText?.length);
+  console.log("First 200 chars:", responseText?.substring(0, 200));
+  console.log("\nParsed companies:", companies?.length);
+  console.log(
+    "Valid companies:",
+    companies?.filter(
+      (c) => c && c.name && c.email && c.role && c.technologiesUsed?.length
+    ).length
+  );
+  if (companies?.[0]) {
+    console.log("\nSample company:");
+    console.log(JSON.stringify(companies[0], null, 2));
+  }
+  console.log("========================\n");
+};
 
+const findCompaniesWithLLM = async (skills, role) => {
+  if (!process.env.GEMINI_API_KEY) {
+    console.log("Gemini API key not found");
+    return [];
+  }
+
+  console.log("Starting LLM search with:", { skills, role });
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
@@ -22,13 +44,22 @@ const findCompaniesWithLLM = async (skills, role) => {
       relatedRoles: getRelatedRoles(role),
       relatedSkills: getRelatedSkills(skills),
     };
+    const prompt = `[INSTRUCTION]
+You are an expert tech industry researcher. Generate a JSON array of tech company profiles matching this candidate:
+${JSON.stringify(searchContext, null, 2)}
 
-    const prompt = `
-      You are an expert tech industry researcher with comprehensive knowledge of companies and startups.
-      Generate detailed company profiles that are actively hiring for roles matching this context:
-      ${JSON.stringify(searchContext, null, 2)}
+[OUTPUT RULES]
+1. Return ONLY a valid JSON array - NO explanations, NO markdown
+2. Each company MUST be a real, actively hiring company
+3. Each company MUST have all required fields
+4. Generate exactly 5 highly relevant companies
+5. Ensure relevanceScore > 0.7 for all companies
+6. Every company MUST have a valid email
+7. Format JSON with proper spacing and indentation
+8. No trailing commas, no unquoted keys
+9. No markdown, no code blocks, no extra text
 
-      TARGET COMPANIES:
+[COMPANY CRITERIA]
       1. Fast-growing startups with recent funding
       2. Tech companies with strong innovation focus
       3. Companies with active hiring in relevant domains
@@ -93,88 +124,136 @@ const findCompaniesWithLLM = async (skills, role) => {
       6. Do not include without email responses, it is of the utmost importance.
       7. Do not include any other text or explanations
     `;
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.7,
+        topP: 0.8,
+        topK: 40,
+        maxOutputTokens: 2048,
+      },
+      safetySettings: [
+        {
+          category: "HARM_CATEGORY_HARASSMENT",
+          threshold: "BLOCK_NONE",
+        },
+      ],
+    });
     const response = await result.response;
     let responseText = response.text();
+    console.log("Received LLM response");
+
     try {
-      // Try to find and clean JSON array in the response
-      const jsonStart = responseText.indexOf("[");
-      const jsonEnd = responseText.lastIndexOf("]") + 1;
-      let jsonStr =
-        jsonStart >= 0 && jsonEnd > 0
-          ? responseText.slice(jsonStart, jsonEnd)
-          : responseText;
+      // Simple JSON parsing
+      let companies = [];
+      try {
+        // Remove any code block markers
+        responseText = responseText
+          .replace(/```(?:json)?\s*|\s*```/g, "")
+          .trim();
 
-      // 1. Remove markdown code block markers
-      jsonStr = jsonStr.replace(/```json\s*|\s*```$/g, "");
+        // Find the JSON array
+        const start = responseText.indexOf("[");
+        const end = responseText.lastIndexOf("]") + 1;
 
-      // 2. Find the last complete company object by looking for the pattern },\s*{
-      const companies = [];
-      let depth = 0;
-      let currentObject = "";
-      let inString = false;
-      let escapeNext = false;
-
-      for (let i = 0; i < jsonStr.length; i++) {
-        const char = jsonStr[i];
-
-        // Handle string literals
-        if (char === '"' && !escapeNext) {
-          inString = !inString;
+        if (start >= 0 && end > start) {
+          // Extract and parse the JSON array
+          const jsonStr = responseText.slice(start, end);
+          companies = JSON.parse(jsonStr);
+          console.log("Successfully parsed JSON array");
+        } else {
+          console.log("No valid JSON array found in response");
         }
-        escapeNext = char === "\\" && !escapeNext;
-
-        if (!inString) {
-          if (char === "{") depth++;
-          if (char === "}") depth--;
-        }
-
-        currentObject += char;
-
-        // Complete object found
-        if (depth === 0 && currentObject.trim()) {
-          try {
-            // Try to parse current object
-            let obj = JSON.parse(currentObject);
-            if (obj && typeof obj === "object") {
-              companies.push(obj);
-            }
-            currentObject = "";
-          } catch (e) {
-            // If parsing fails, this might be the incomplete/corrupted part
-            break;
-          }
-        }
-      } // Filter and normalize companies
+      } catch (e) {
+        console.error("JSON parsing failed:", e);
+      }
+      console.log("Raw companies found:", companies.length);
+      // Filter and normalize companies
       const validCompanies = companies
-        .filter(
-          (company) =>
-            company &&
-            typeof company.name === "string" &&
-            !company.name.includes("[") && // Filter out template placeholders
-            !company.name.includes("]") &&
-            company.openRoles?.length > 0 &&
-            company.technologiesUsed?.length > 0 &&
-            company.relevanceScore > 0.7 // Only keep highly relevant matches
-        )
+        .filter((company) => {
+          if (!company) return false;
+
+          const validationChecks = {
+            // Basic info validation
+            hasName:
+              typeof company.name === "string" && company.name.length > 0,
+            validName:
+              !company.name?.includes("[") && !company.name?.includes("]"),
+            hasEmail:
+              typeof company.email === "string" && company.email.includes("@"),
+
+            // Role and tech stack validation
+            hasRoles:
+              Array.isArray(company.openRoles) && company.openRoles.length > 0,
+            validRoles: company.openRoles?.some((r) => r && r.title),
+            hasTechStack:
+              Array.isArray(company.technologiesUsed) &&
+              company.technologiesUsed.length > 0,
+
+            // Relevance validation
+            highRelevance:
+              typeof company.relevanceScore === "number" &&
+              company.relevanceScore > 0.7,
+          };
+
+          const isValid = Object.values(validationChecks).every(Boolean);
+
+          if (!isValid) {
+            console.log("Invalid company:", {
+              name: company.name,
+              ...validationChecks,
+            });
+          }
+          return isValid;
+        })
         .map((company) => {
-          const normalizedName = company.name.trim();
+          // Clean and normalize company name
+          const normalizedName = company.name
+            .trim()
+            .replace(/\s+/g, " ") // Normalize whitespace
+            .replace(/[^\w\s.-]/g, ""); // Remove special chars except dots and dashes
+
+          // Generate domain name for email
           const domainName = normalizedName
             .toLowerCase()
             .replace(/[^a-z0-9]/g, "");
+
+          // Ensure valid role title exists
           const inferredRole =
-            company.openRoles?.[0]?.title || role || "Software Engineer";
+            company.openRoles?.find((r) => r?.title)?.title ||
+            role ||
+            "Software Engineer";
+
+          // Clean and dedupe tech stack
+          const cleanTechStack = Array.from(
+            new Set(
+              company.technologiesUsed
+                .filter(Boolean)
+                .map((tech) => tech.trim())
+                .filter((tech) => tech.length > 0)
+            )
+          );
 
           return {
             ...company,
             name: normalizedName,
             email: company.email || `careers@${domainName}.com`,
             role: inferredRole,
-            openRoles: company.openRoles || [{ title: inferredRole }],
-            technologiesUsed: company.technologiesUsed || [],
+            website: company.website || `https://www.${domainName}.com`,
+            openRoles: [
+              { title: inferredRole, ...company.openRoles?.[0] },
+              ...(company.openRoles?.slice(1) || []),
+            ].filter((r) => r?.title), // Keep only roles with titles
+            technologiesUsed: cleanTechStack,
+            relevanceScore: Math.min(
+              Math.max(company.relevanceScore || 0.7, 0),
+              1
+            ), // Clamp between 0-1
           };
         });
 
+      logLLMResponse(responseText, validCompanies);
+      console.log("Filtered down to", validCompanies.length, "valid companies");
       return validCompanies;
     } catch (e) {
       console.error("Failed to parse LLM response:", e);
