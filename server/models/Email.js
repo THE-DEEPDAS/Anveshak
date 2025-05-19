@@ -44,10 +44,18 @@ const emailSchema = new mongoose.Schema({
   },
   companyResearch: {
     overview: String,
-    achievements: String,
+    achievements: [String],
     culture: String,
-    projects: String,
-    techStack: String,
+    projects: [String],
+    techStack: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {
+        frontend: [],
+        backend: [],
+        devops: [],
+        other: [],
+      },
+    },
   },
   matchReason: {
     type: String,

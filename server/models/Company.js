@@ -8,6 +8,22 @@ const companySchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
+    email: {
+      type: String,
+      required: true,
+      trim: true,
+      validate: {
+        validator: function (v) {
+          return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+        },
+        message: (props) => `${props.value} is not a valid email address!`,
+      },
+    },
+    role: {
+      type: String,
+      required: true,
+      trim: true,
+    },
     description: {
       type: String,
       trim: true,
@@ -59,6 +75,21 @@ const companySchema = new mongoose.Schema(
         },
       },
     ],
+    companyResearch: {
+      overview: { type: String, default: "" },
+      achievements: { type: [String], default: [] },
+      culture: { type: String, default: "" },
+      projects: { type: [String], default: [] },
+      techStack: {
+        type: mongoose.Schema.Types.Mixed,
+        default: {
+          frontend: [],
+          backend: [],
+          devops: [],
+          other: [],
+        },
+      },
+    },
     openRoles: [
       {
         title: {

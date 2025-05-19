@@ -53,17 +53,17 @@ const findCompaniesWithLLM = async (skills, role) => {
          - Modern tech stack
          - Engineering-driven culture
          - Active in relevant domains
-         - Investment in new technologies
-
-      OUTPUT FORMAT:
+         - Investment in new technologies      OUTPUT FORMAT:
       Return a JSON array of company profiles, each with:
       {
-        "name": "string (company name)",
+        "name": "string (company name) - REQUIRED",
+        "email": "string (recruiting/careers email) - REQUIRED",
+        "role": "string (specific role title matching the skills) - REQUIRED",
         "description": "string (brief company overview)",
         "industry": "string (primary industry)",
         "size": "string (startup|small|medium|large|enterprise)",
-        "technologiesUsed": ["array of tech stack"],
-        "openRoles": [{
+        "technologiesUsed": ["array of tech stack"] - REQUIRED,
+        "openRoles": [{ - REQUIRED
           "title": "string (job title)",
           "department": "string (e.g., Engineering)",
           "skills": ["required skills"],
@@ -81,7 +81,7 @@ const findCompaniesWithLLM = async (skills, role) => {
           "remote": boolean
         },
         "website": "string or null",
-        "relevanceScore": number (0-1)
+        "relevanceScore": number (0-1) - REQUIRED
       }
 
       COMPULSARY RESPONSE REQUIREMENTS:
@@ -145,20 +145,35 @@ const findCompaniesWithLLM = async (skills, role) => {
             break;
           }
         }
-      }
+      } // Filter and normalize companies
+      const validCompanies = companies
+        .filter(
+          (company) =>
+            company &&
+            typeof company.name === "string" &&
+            !company.name.includes("[") && // Filter out template placeholders
+            !company.name.includes("]") &&
+            company.openRoles?.length > 0 &&
+            company.technologiesUsed?.length > 0 &&
+            company.relevanceScore > 0.7 // Only keep highly relevant matches
+        )
+        .map((company) => {
+          const normalizedName = company.name.trim();
+          const domainName = normalizedName
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, "");
+          const inferredRole =
+            company.openRoles?.[0]?.title || role || "Software Engineer";
 
-      // Filter valid companies
-      const validCompanies = companies.filter((company) => {
-        return (
-          company &&
-          typeof company.name === "string" &&
-          !company.name.includes("[") && // Filter out template placeholders
-          !company.name.includes("]") &&
-          company.openRoles?.length > 0 &&
-          company.technologiesUsed?.length > 0 &&
-          company.relevanceScore > 0.7 // Only keep highly relevant matches
-        );
-      });
+          return {
+            ...company,
+            name: normalizedName,
+            email: company.email || `careers@${domainName}.com`,
+            role: inferredRole,
+            openRoles: company.openRoles || [{ title: inferredRole }],
+            technologiesUsed: company.technologiesUsed || [],
+          };
+        });
 
       return validCompanies;
     } catch (e) {
@@ -248,151 +263,82 @@ const getRelatedSkills = (skills) => {
 
 export const searchCompanies = async (skills, role) => {
   try {
-    if (!Array.isArray(skills) || !role) {
-      throw new Error("Invalid search parameters");
-    }
-
-    // First try finding companies using LLM
+    // First try LLM search
     console.log("Attempting to find companies using LLM...");
-    const llmResults = await findCompaniesWithLLM(skills, role);
-    console.log("LLM Results:", JSON.stringify(llmResults, null, 2));
+    const llmCompanies = await findCompaniesWithLLM(skills, role);
+    let dbCompanies = [];
 
-    if (llmResults && llmResults.length > 0) {
-      // Enrich each company with web data
-      const enrichedResults = await Promise.all(
-        llmResults.map(async (company) => {
-          if (company.website) {
-            const scrapedData = await scrapeCompanyWebsite(company.website);
-            if (scrapedData) {
-              return {
-                ...company,
-                openRoles: [
-                  ...(company.openRoles || []),
-                  ...(scrapedData.openRoles || []),
-                ],
-                technologiesUsed: [
-                  ...new Set([
-                    ...(company.technologiesUsed || []),
-                    ...(scrapedData.techStack || []),
-                  ]),
-                ],
-                culture: {
-                  values: [
-                    ...new Set([
-                      ...(company.culture?.values || []),
-                      ...(scrapedData.culture?.values || []),
-                    ]),
-                  ],
-                  benefits: [
-                    ...new Set([
-                      ...(company.culture?.benefits || []),
-                      ...(scrapedData.culture?.benefits || []),
-                    ]),
-                  ],
-                },
-                social: scrapedData.social,
-              };
-            }
-          }
-          return company;
+    if (!llmCompanies?.length) {
+      // If LLM search fails or returns no results, fall back to database
+      console.log("No LLM results, falling back to database search...");
+
+      // First try exact match
+      dbCompanies = await Company.find({
+        $or: [
+          { roles: { $in: [role] } },
+          { role: { $regex: new RegExp(escapeRegExp(role), "i") } },
+          {
+            "technologiesUsed.name": {
+              $in: skills.map((skill) => new RegExp(escapeRegExp(skill), "i")),
+            },
+          },
+        ],
+      }).lean();
+
+      // If still no results, get some default tech companies
+      if (!dbCompanies.length) {
+        console.log("No exact matches, getting default tech companies...");
+        dbCompanies = await Company.find({
+          $or: [
+            { industry: { $in: ["Technology", "Software", "IT"] } },
+            { role: "Software Engineer" },
+          ],
         })
-      );
-
-      // Save enriched results to database
-      await saveCompaniesToDatabase(enrichedResults);
-      return enrichedResults;
+          .sort({ lastUpdated: -1 })
+          .limit(5)
+          .lean();
+      }
     }
 
-    // Explicit fallback to database search
-    console.log("No LLM results, falling back to database search...");
-    const companies = await Company.aggregate([
-      {
-        $match: {
-          $or: [
-            {
-              openRoles: {
-                $elemMatch: {
-                  title: { $regex: escapeRegExp(role), $options: "i" },
-                },
-              },
-            },
-            {
-              technologiesUsed: {
-                $in: skills.map(
-                  (skill) => new RegExp(escapeRegExp(skill), "i")
-                ),
-              },
-            },
-          ],
-          "openRoles.0": { $exists: true },
-        },
-      },
-      {
-        $addFields: {
-          roleMatchCount: {
-            $size: {
-              $filter: {
-                input: "$openRoles",
-                as: "role",
-                cond: {
-                  $regexMatch: {
-                    input: "$$role.title",
-                    regex: escapeRegExp(role),
-                    options: "i",
-                  },
-                },
-              },
-            },
-          },
-          skillMatchCount: {
-            $size: {
-              $setIntersection: ["$technologiesUsed", skills],
-            },
-          },
-        },
-      },
-      {
-        $addFields: {
-          relevanceScore: {
-            $add: [
-              { $multiply: ["$roleMatchCount", 30] },
-              { $multiply: ["$skillMatchCount", 5] },
-              {
-                $switch: {
-                  branches: [
-                    { case: { $eq: ["$size", "startup"] }, then: 20 },
-                    { case: { $eq: ["$size", "small"] }, then: 15 },
-                    { case: { $eq: ["$size", "medium"] }, then: 10 },
-                  ],
-                  default: 5,
-                },
-              },
-            ],
-          },
-        },
-      },
-      {
-        $match: {
-          $or: [
-            { roleMatchCount: { $gt: 0 } },
-            { skillMatchCount: { $gt: 0 } },
-          ],
-        },
-      },
-      { $sort: { relevanceScore: -1 } },
-      { $limit: 15 },
-    ]);
+    // Use LLM results if available, otherwise use DB results
+    const baseCompanies = llmCompanies?.length
+      ? llmCompanies
+      : dbCompanies || [];
+    console.log(
+      `Found ${baseCompanies.length} companies in ${
+        llmCompanies?.length ? "LLM" : "database"
+      }`
+    );
 
-    if (companies.length === 0) {
-      console.log("No companies found in database either");
-      return [];
-    }
+    // Deduplicate results
+    const uniqueCompanies = Array.from(
+      new Map(
+        baseCompanies.map((company) => [company.name.toLowerCase(), company])
+      ).values()
+    );
 
-    console.log(`Found ${companies.length} companies in database`);
-    return companies;
+    // Ensure all companies have required fields with proper format
+    return uniqueCompanies.map((company) => {
+      const normalizedName = company.name.trim();
+      const domainName = normalizedName.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+      return {
+        name: normalizedName,
+        email: company.email || `careers@${domainName}.com`,
+        role: company.role || role || "Software Engineer",
+        technologiesUsed: company.technologiesUsed || [],
+        openRoles: company.openRoles || [
+          { title: role || "Software Engineer" },
+        ],
+        research: company.research || {},
+        matchReason:
+          company.matchReason ||
+          `Skills match with ${skills.slice(0, 3).join(", ")}`,
+      };
+    });
   } catch (error) {
-    console.error("Error searching companies:", error);
-    throw error;
+    console.error("Error in searchCompanies:", error);
+    return [];
   }
 };
 
@@ -591,16 +537,42 @@ export const generateCompanyEmail = async (company, role, resume) => {
 export const saveCompaniesToDatabase = async (companies) => {
   try {
     for (const company of companies) {
-      // Skip invalid entries
       if (!company.name) continue;
 
-      // Create or update company
+      // Normalize research data structure
+      const normalizedCompany = {
+        ...company,
+        companyResearch: {
+          overview: company.research?.overview || "",
+          achievements: Array.isArray(company.research?.achievements)
+            ? company.research.achievements
+            : [],
+          culture: company.research?.culture || "",
+          projects: Array.isArray(company.research?.projects)
+            ? company.research.projects
+            : [],
+          techStack: {
+            frontend: Array.isArray(company.research?.techStack?.frontend)
+              ? company.research.techStack.frontend
+              : [],
+            backend: Array.isArray(company.research?.techStack?.backend)
+              ? company.research.techStack.backend
+              : [],
+            devops: Array.isArray(company.research?.techStack?.devops)
+              ? company.research.techStack.devops
+              : [],
+            other: Array.isArray(company.research?.techStack?.other)
+              ? company.research.techStack.other
+              : [],
+          },
+        },
+        lastScraped: new Date(),
+      };
+
+      // Create or update company with normalized data
       await Company.findOneAndUpdate(
         { name: company.name },
-        {
-          ...company,
-          lastScraped: new Date(),
-        },
+        normalizedCompany,
         { upsert: true, new: true }
       );
     }

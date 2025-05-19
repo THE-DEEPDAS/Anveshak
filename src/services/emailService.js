@@ -260,5 +260,3 @@ export const editEmail = async (emailId, { subject, body }) => {
     );
   }
 };
-
-export default router;

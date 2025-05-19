@@ -6,6 +6,8 @@ import Company from "../models/Company.js";
 const companies = [
   {
     name: "Cruise",
+    email: "careers@getcruise.com",
+    role: "Robotics Software Engineer",
     description:
       "Autonomous vehicle technology company developing self-driving cars and robotaxis",
     website: "https://www.getcruise.com",
@@ -87,6 +89,28 @@ const companies = [
         technologies: ["Autonomous Systems", "LiDAR", "Computer Vision"],
       },
     ],
+    companyResearch: {
+      overview:
+        "Autonomous vehicle technology company at the forefront of self-driving car development",
+      achievements: [
+        "Successfully deployed autonomous vehicles in San Francisco",
+        "Developed proprietary self-driving technology stack",
+        "Achieved significant milestones in safety and reliability",
+      ],
+      culture:
+        "Strong focus on engineering excellence and safety-first approach",
+      projects: [
+        "Cruise Origin autonomous vehicle development",
+        "Self-driving technology platform enhancement",
+        "Urban mobility solutions",
+      ],
+      techStack: {
+        frontend: ["React", "TypeScript", "WebGL"],
+        backend: ["C++", "Python", "ROS"],
+        devops: ["Kubernetes", "Docker", "AWS"],
+        other: ["Computer Vision", "Machine Learning", "Sensor Fusion"],
+      },
+    },
   },
   {
     name: "Boston Dynamics",
@@ -185,6 +209,28 @@ const companies = [
         ],
       },
     ],
+    companyResearch: {
+      overview:
+        "Leading robotics company specializing in advanced mobile manipulation robots",
+      achievements: [
+        "Developed the world's first commercially available bipedal robot",
+        "Pioneered the use of AI and machine learning in robotics",
+        "Achieved significant advancements in robot mobility and manipulation",
+      ],
+      culture:
+        "Innovative and research-driven culture with a focus on robotics advancements",
+      projects: [
+        "Development of Spot, the agile mobile robot",
+        "Advancements in humanoid robot capabilities",
+        "Research in AI-driven robotic perception and navigation",
+      ],
+      techStack: {
+        frontend: ["React", "Node.js"],
+        backend: ["Python", "C++"],
+        devops: ["Docker", "AWS", "CI/CD"],
+        other: ["ROS", "OpenCV", "TensorFlow"],
+      },
+    },
   },
   {
     name: "Anthropic",
@@ -273,6 +319,28 @@ const companies = [
         ],
       },
     ],
+    companyResearch: {
+      overview:
+        "AI research company focused on developing safe and ethical AI systems",
+      achievements: [
+        "Developed Claude, an AI language model with safety and ethical considerations",
+        "Pioneered research in constitutional AI and AI alignment",
+        "Contributed to open-source AI safety research and tools",
+      ],
+      culture:
+        "Collaborative and mission-driven culture with a focus on AI safety",
+      projects: [
+        "Research and development of AI language models",
+        "AI safety and alignment research",
+        "Open-source contributions and collaborations",
+      ],
+      techStack: {
+        frontend: ["React", "Flask"],
+        backend: ["Python", "FastAPI"],
+        devops: ["Docker", "Kubernetes", "AWS"],
+        other: ["PyTorch", "TensorFlow", "JAX"],
+      },
+    },
   },
   {
     name: "TCS (Tata Consultancy Services)",
@@ -357,6 +425,28 @@ const companies = [
         technologies: ["Banking Technology", "Financial Services", "Cloud"],
       },
     ],
+    companyResearch: {
+      overview:
+        "India's largest IT services company providing consulting, technology, and digital solutions",
+      achievements: [
+        "Pioneered IT services and consulting in India",
+        "Consistently ranked among the top IT service providers globally",
+        "Achieved significant milestones in digital transformation and cloud services",
+      ],
+      culture:
+        "Diverse and inclusive culture with a focus on innovation and excellence",
+      projects: [
+        "Large-scale IT service management and consulting projects",
+        "Digital transformation initiatives for global clients",
+        "Cloud migration and management projects",
+      ],
+      techStack: {
+        frontend: ["Angular", "React"],
+        backend: ["Java", "Python", "Node.js"],
+        devops: ["Docker", "Kubernetes", "AWS", "Azure"],
+        other: ["SAP", "Oracle", "Salesforce"],
+      },
+    },
   },
   {
     name: "Ather Energy",
@@ -444,6 +534,28 @@ const companies = [
         technologies: ["Electric Powertrain", "IoT", "Smart Connectivity"],
       },
     ],
+    companyResearch: {
+      overview:
+        "Indian electric vehicle manufacturer pioneering smart electric scooters",
+      achievements: [
+        "Launched India's first smart electric scooter, Ather 450",
+        "Established a robust charging infrastructure with Ather Grid",
+        "Achieved significant advancements in electric powertrain technology",
+      ],
+      culture:
+        "Innovative and sustainability-focused culture with a passion for clean energy",
+      projects: [
+        "Development of next-gen electric scooters",
+        "Expansion of charging infrastructure",
+        "Research in battery technology and energy management systems",
+      ],
+      techStack: {
+        frontend: ["React", "Node.js"],
+        backend: ["Python", "C++"],
+        devops: ["Docker", "Kubernetes", "AWS"],
+        other: ["IoT", "Machine Learning", "Computer Vision"],
+      },
+    },
   },
   {
     name: "DeepMind",
@@ -527,6 +639,27 @@ const companies = [
         technologies: ["Deep Learning", "Computational Biology", "AI"],
       },
     ],
+    companyResearch: {
+      overview: "World-leading artificial intelligence research company",
+      achievements: [
+        "Developed AlphaFold, a revolutionary AI system for protein folding prediction",
+        "Pioneered research in deep reinforcement learning and neural networks",
+        "Contributed to significant advancements in AI safety and ethics",
+      ],
+      culture:
+        "Cutting-edge research culture with a focus on collaboration and innovation",
+      projects: [
+        "Research in AI for healthcare and drug discovery",
+        "Advancements in AI safety and ethical considerations",
+        "Open-source AI research and tools development",
+      ],
+      techStack: {
+        frontend: ["React", "Flask"],
+        backend: ["Python", "TensorFlow", "JAX"],
+        devops: ["Docker", "Kubernetes", "GCP"],
+        other: ["Deep Learning", "Reinforcement Learning", "Neural Networks"],
+      },
+    },
   },
   {
     name: "Agnikul Cosmos",
@@ -615,6 +748,28 @@ const companies = [
         ],
       },
     ],
+    companyResearch: {
+      overview:
+        "Indian space technology company developing small satellite launch vehicles",
+      achievements: [
+        "Successfully tested India's first private rocket, Agnibaan",
+        "Developed innovative 3D printing technology for rocket components",
+        "Achieved significant milestones in small satellite launch capabilities",
+      ],
+      culture:
+        "Dynamic and innovative culture with a focus on space technology advancements",
+      projects: [
+        "Development of Agnibaan small satellite launch vehicle",
+        "Research in propulsion systems and fluid dynamics",
+        "Advancements in 3D printing technology for aerospace applications",
+      ],
+      techStack: {
+        frontend: ["React", "Node.js"],
+        backend: ["Python", "CAD/CAM"],
+        devops: ["Docker", "Kubernetes", "AWS"],
+        other: ["3D Printing", "Rocket Propulsion", "Fluid Dynamics"],
+      },
+    },
   },
   {
     name: "IonQ",
@@ -699,6 +854,28 @@ const companies = [
         technologies: ["Quantum Computing", "Ion Trapping", "Quantum Control"],
       },
     ],
+    companyResearch: {
+      overview:
+        "Leading quantum computing company developing trapped-ion quantum computers",
+      achievements: [
+        "Developed the world's most powerful quantum computer, IonQ Aria",
+        "Pioneered research in trapped-ion quantum computing technology",
+        "Achieved significant advancements in quantum algorithm development",
+      ],
+      culture:
+        "Innovative and research-focused culture with a passion for quantum computing",
+      projects: [
+        "Development of IonQ Aria quantum computer",
+        "Research in quantum algorithms and software",
+        "Advancements in trapped-ion quantum computing technology",
+      ],
+      techStack: {
+        frontend: ["React", "Redux"],
+        backend: ["Python", "Node.js"],
+        devops: ["Docker", "Kubernetes", "AWS"],
+        other: ["Qiskit", "Ion Trapping", "Quantum Algorithms"],
+      },
+    },
   },
   {
     name: "Moderna",
@@ -787,6 +964,28 @@ const companies = [
         ],
       },
     ],
+    companyResearch: {
+      overview:
+        "Biotechnology company pioneering mRNA therapeutics and vaccines",
+      achievements: [
+        "Developed the first mRNA vaccine, Spikevax, for COVID-19",
+        "Pioneered research in mRNA technology and its applications",
+        "Contributed to significant advancements in vaccine development and infectious diseases",
+      ],
+      culture:
+        "Mission-driven culture with a focus on innovation and scientific excellence",
+      projects: [
+        "Research and development of mRNA therapeutics and vaccines",
+        "Advancements in vaccine delivery and formulation technologies",
+        "Collaborations for global health initiatives and pandemic response",
+      ],
+      techStack: {
+        frontend: ["React", "Redux"],
+        backend: ["Python", "Node.js"],
+        devops: ["Docker", "Kubernetes", "AWS"],
+        other: ["mRNA Technology", "Bioinformatics", "Vaccine Development"],
+      },
+    },
   },
   {
     name: "Zerodha",
@@ -871,6 +1070,28 @@ const companies = [
         technologies: ["Trading Systems", "Real-time Data", "Web Technologies"],
       },
     ],
+    companyResearch: {
+      overview:
+        "India's largest retail stockbroker revolutionizing trading and investing",
+      achievements: [
+        "Launched Zerodha Kite, a pioneering trading platform in India",
+        "Introduced innovative pricing models disrupting traditional brokerage",
+        "Achieved significant growth in retail participation in stock markets",
+      ],
+      culture:
+        "Customer-centric and innovative culture with a focus on financial empowerment",
+      projects: [
+        "Development of Zerodha Kite trading platform",
+        "Research in algorithmic trading and market analytics",
+        "Initiatives for investor education and awareness",
+      ],
+      techStack: {
+        frontend: ["Angular", "React"],
+        backend: ["Python", "Go", "Node.js"],
+        devops: ["Docker", "Kubernetes", "AWS"],
+        other: ["WebSockets", "REST APIs", "SQL/NoSQL Databases"],
+      },
+    },
   },
   {
     name: "Razorpay",
@@ -955,6 +1176,28 @@ const companies = [
         technologies: ["Payment Processing", "Banking APIs", "Security"],
       },
     ],
+    companyResearch: {
+      overview:
+        "Indian fintech company providing payment solutions and banking services",
+      achievements: [
+        "Launched Razorpay Payment Gateway, a comprehensive payment processing solution",
+        "Pioneered the use of UPI in merchant payments",
+        "Achieved significant growth in transaction volume and merchant adoption",
+      ],
+      culture:
+        "Dynamic and customer-focused culture with a passion for fintech innovation",
+      projects: [
+        "Development of Razorpay Payment Gateway",
+        "Research in payment security and fraud detection",
+        "Initiatives for financial inclusion and digital banking",
+      ],
+      techStack: {
+        frontend: ["React", "Redux"],
+        backend: ["Node.js", "Python", "Java"],
+        devops: ["Docker", "Kubernetes", "AWS"],
+        other: ["UPI", "PCI DSS Compliance", "Payment Analytics"],
+      },
+    },
   },
   {
     name: "Rigetti Computing",
@@ -1043,6 +1286,32 @@ const companies = [
         ],
       },
     ],
+    companyResearch: {
+      overview:
+        "Quantum computing company developing superconducting quantum processors",
+      achievements: [
+        "Developed the world's first quantum computer with superconducting qubits",
+        "Pioneered research in quantum machine learning and quantum software",
+        "Achieved significant advancements in quantum hardware and algorithms",
+      ],
+      culture:
+        "Innovative and research-driven culture with a focus on quantum technologies",
+      projects: [
+        "Development of Aspen superconducting quantum processors",
+        "Research in quantum algorithms and machine learning",
+        "Advancements in quantum hardware and software integration",
+      ],
+      techStack: {
+        frontend: ["React", "Node.js"],
+        backend: ["Python", "Quil"],
+        devops: ["Docker", "Kubernetes", "AWS"],
+        other: [
+          "Quantum Computing",
+          "Superconducting Circuits",
+          "Quantum Algorithms",
+        ],
+      },
+    },
   },
   {
     name: "Tesla",
@@ -1136,6 +1405,27 @@ const companies = [
         technologies: ["Energy Storage", "Power Electronics", "Smart Grid"],
       },
     ],
+    companyResearch: {
+      overview: "Leading electric vehicle and clean energy company",
+      achievements: [
+        "Developed the first highway-capable autonomous vehicle",
+        "Pioneered the use of AI and machine learning in self-driving cars",
+        "Achieved significant advancements in battery technology and energy storage",
+      ],
+      culture:
+        "Innovative and mission-driven culture with a focus on sustainability and technology",
+      projects: [
+        "Development of Tesla Autopilot and Full Self-Driving features",
+        "Advancements in battery technology and energy solutions",
+        "Research in sustainable energy and transportation systems",
+      ],
+      techStack: {
+        frontend: ["React", "Redux"],
+        backend: ["Python", "C++", "CUDA"],
+        devops: ["Docker", "Kubernetes", "AWS"],
+        other: ["TensorFlow", "OpenCV", "ROS"],
+      },
+    },
   },
 ];
 
@@ -1151,7 +1441,69 @@ async function initializeDatabase() {
 
     // Insert new companies with proper validation and error handling
     for (const companyData of companies) {
+      // Ensure required fields: email and role
+      if (!companyData.email) {
+        // Try to infer domain from website, fallback to generic
+        let domain = "example.com";
+        if (companyData.website) {
+          try {
+            domain = new URL(companyData.website).hostname.replace(
+              /^www\./,
+              ""
+            );
+          } catch {}
+        }
+        companyData.email = `careers@${domain}`;
+      }
+      if (!companyData.role) {
+        // Use first openRole title if available, else fallback
+        if (
+          Array.isArray(companyData.openRoles) &&
+          companyData.openRoles.length > 0 &&
+          companyData.openRoles[0].title
+        ) {
+          companyData.role = companyData.openRoles[0].title;
+        } else {
+          companyData.role = "Software Engineer";
+        }
+      }
       try {
+        // Normalize companyResearch and techStack
+        if (companyData.companyResearch) {
+          companyData.companyResearch = {
+            overview: companyData.companyResearch.overview || "",
+            achievements: Array.isArray(
+              companyData.companyResearch.achievements
+            )
+              ? companyData.companyResearch.achievements
+              : [],
+            culture: companyData.companyResearch.culture || "",
+            projects: Array.isArray(companyData.companyResearch.projects)
+              ? companyData.companyResearch.projects
+              : [],
+            techStack: {
+              frontend: Array.isArray(
+                companyData.companyResearch.techStack?.frontend
+              )
+                ? companyData.companyResearch.techStack.frontend
+                : [],
+              backend: Array.isArray(
+                companyData.companyResearch.techStack?.backend
+              )
+                ? companyData.companyResearch.techStack.backend
+                : [],
+              devops: Array.isArray(
+                companyData.companyResearch.techStack?.devops
+              )
+                ? companyData.companyResearch.techStack.devops
+                : [],
+              other: Array.isArray(companyData.companyResearch.techStack?.other)
+                ? companyData.companyResearch.techStack.other
+                : [],
+            },
+          };
+        }
+
         const company = new Company(companyData);
         await company.save();
         console.log(`Added company: ${company.name}`);

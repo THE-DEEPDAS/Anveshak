@@ -46,11 +46,11 @@ router.post("/generate", async (req, res) => {
       });
     }
     switch (action) {
-      case "find-companies":
-        // First try finding companies from our database
+      case "find-companies": // First try finding companies from our database
+        const defaultRole = req.body.role || "Software Engineer";
         let matchingCompanies = await Company.find({
           $or: [
-            { roles: { $in: [req.body.role || "Software Engineer"] } },
+            { roles: { $in: [defaultRole] } },
             {
               "research.techStack": {
                 $in: resume.skills.map(
@@ -61,13 +61,36 @@ router.post("/generate", async (req, res) => {
           ],
         })
           .sort({ lastUpdated: -1 })
-          .limit(5);
+          .limit(5)
+          .lean() // Convert to plain objects
+          .then((companies) =>
+            companies.map((company) => ({
+              ...company,
+              role: defaultRole,
+              email:
+                company.email ||
+                `careers@${company.name
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]/g, "")}.com`,
+            }))
+          );
 
         // If not enough results, use LLM to find more
         if (matchingCompanies.length < 5) {
+          // Search for new companies using LLM
           const newCompanies = await searchCompanies(
             resume.skills || [],
-            req.body.role || "Software Engineer"
+            defaultRole
+          ).then((companies) =>
+            companies.map((company) => ({
+              ...company,
+              role: company.role || defaultRole,
+              email:
+                company.email ||
+                `careers@${company.name
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]/g, "")}.com`,
+            }))
           );
 
           // Merge results, prioritizing DB results
@@ -90,24 +113,50 @@ router.post("/generate", async (req, res) => {
           });
         }
 
-        // Enrich results with researched data
-        const enrichedCompanies = await Promise.all(
-          matchingCompanies.map(async (company) => {
-            try {
-              const research = await researchCompany(company.name);
-              return {
-                ...company,
-                research: research || {},
-              };
-            } catch (error) {
-              console.error(
-                `Error researching company ${company.name}:`,
-                error
-              );
-              return company;
-            }
-          })
-        );
+        // Enrich results with researched data          // Validate and enrich companies with research data
+        const enrichedCompanies = (
+          await Promise.all(
+            matchingCompanies.map(async (company) => {
+              try {
+                if (!company.name) {
+                  console.error("Invalid company without name:", company);
+                  return null;
+                }
+
+                // Ensure basic company structure
+                const baseCompany = {
+                  name: company.name,
+                  email:
+                    company.email ||
+                    `contact@${company.name
+                      .toLowerCase()
+                      .replace(/[^a-z0-9]/g, "")}.com`,
+                  role:
+                    company.role ||
+                    company.openRoles?.[0]?.title ||
+                    "Software Engineer",
+                  technologiesUsed: company.technologiesUsed || [],
+                  openRoles: company.openRoles || [],
+                };
+
+                // Get research data
+                const research = await researchCompany(company.name);
+
+                return {
+                  ...baseCompany,
+                  research: research || {},
+                  matchReason: company.matchReason || "Skills match",
+                };
+              } catch (error) {
+                console.error(
+                  `Error processing company ${company.name}:`,
+                  error
+                );
+                return null;
+              }
+            })
+          )
+        ).filter(Boolean); // Remove null entries
 
         return res.status(200).json({ companies: enrichedCompanies });
       case "generate-emails":
@@ -115,19 +164,36 @@ router.post("/generate", async (req, res) => {
           return res
             .status(400)
             .json({ message: "Selected companies are required" });
-        }
-
-        // Generate personalized emails for selected companies
+        } // Generate personalized emails for selected companies
         const emailPromises = companies.map(async (company) => {
-          if (!company.name || !company.email || !company.role) {
-            throw new Error("Invalid company data");
+          // Validate required company data
+          const requiredFields = ["name", "email", "role"];
+          const missingFields = requiredFields.filter(
+            (field) => !company[field]
+          );
+
+          if (missingFields.length > 0) {
+            console.error(
+              `Invalid company data for ${
+                company.name || "unknown company"
+              }. Missing fields:`,
+              missingFields
+            );
+            throw new Error(
+              `Invalid company data: Missing ${missingFields.join(", ")}`
+            );
+          }
+
+          // Normalize and validate email format
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(company.email)) {
+            throw new Error(`Invalid email format for company ${company.name}`);
           }
 
           // Ensure we have research data for the company
-          let companyWithResearch = company;
+          let companyWithResearch = { ...company };
           if (!company.research) {
             const research = await researchCompany(company.name);
-            companyWithResearch = { ...company, research };
+            companyWithResearch.research = research;
           }
 
           // Save or update company in database
@@ -154,9 +220,32 @@ router.post("/generate", async (req, res) => {
             experience: resume.experience || [],
             projects: resume.projects || [],
             companyResearch: companyWithResearch.research,
-          });
+          }); // Create new email document with normalized research data
+          const normalizedResearch = {
+            overview: company.research?.overview || "",
+            achievements: Array.isArray(company.research?.achievements)
+              ? company.research.achievements
+              : [],
+            culture: company.research?.culture || "",
+            projects: Array.isArray(company.research?.projects)
+              ? company.research.projects
+              : [],
+            techStack: {
+              frontend: Array.isArray(company.research?.techStack?.frontend)
+                ? company.research.techStack.frontend
+                : [],
+              backend: Array.isArray(company.research?.techStack?.backend)
+                ? company.research.techStack.backend
+                : [],
+              devops: Array.isArray(company.research?.techStack?.devops)
+                ? company.research.techStack.devops
+                : [],
+              other: Array.isArray(company.research?.techStack?.other)
+                ? company.research.techStack.other
+                : [],
+            },
+          };
 
-          // Create new email document
           const email = new Email({
             user: resume.user._id,
             resume: resume._id,
@@ -166,7 +255,7 @@ router.post("/generate", async (req, res) => {
             subject: emailContent.subject,
             body: emailContent.body,
             status: "draft",
-            companyResearch: company.research,
+            companyResearch: normalizedResearch,
             matchReason: company.matchReason,
           });
 

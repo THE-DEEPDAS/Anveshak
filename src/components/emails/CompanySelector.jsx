@@ -18,14 +18,19 @@ const CompanySelector = ({ companies, onCompaniesSelected }) => {
       onCompaniesSelected(selectedCompanies);
     }
   };
-
   const formatTechStack = (techStack) => {
     if (!techStack) return "";
     if (typeof techStack === "string") return techStack;
     if (typeof techStack === "object") {
-      const stack = [];
+      let stack = [];
+      if (techStack.frontend) stack.push(...techStack.frontend);
+      if (techStack.backend) stack.push(...techStack.backend);
+      if (techStack.devops) stack.push(...techStack.devops);
+      if (techStack.other) stack.push(...techStack.other);
       if (techStack.software) stack.push(...techStack.software);
       if (techStack.hardware) stack.push(...techStack.hardware);
+      // Remove duplicates
+      stack = Array.from(new Set(stack));
       return stack.join(", ");
     }
     return "";
