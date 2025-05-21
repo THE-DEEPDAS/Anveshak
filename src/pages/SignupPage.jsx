@@ -38,6 +38,7 @@ const SignupPage = () => {
   };
 
   return (
+    
     <div className="container mx-auto px-4 py-10">
       <div className="max-w-md mx-auto bg-white p-6 rounded-lg shadow-md">
         <h1 className="text-2xl font-bold text-gray-800 mb-6">Sign Up</h1>
@@ -117,6 +118,7 @@ const SignupPage = () => {
         </form>
       </div>
     </div>
+    
   );
 };
 

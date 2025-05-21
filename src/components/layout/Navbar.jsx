@@ -140,8 +140,7 @@ const Navbar = () => {
           </div>
         )}
       </div>
-    );
-  };
+    );  };
 
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
@@ -153,7 +152,8 @@ const Navbar = () => {
             className="h-8 w-8 object-contain rounded-full"
           />
           <span className="font-bold text-xl text-gray-800">Anveshak</span>
-        </Link>        <nav className="flex items-center space-x-6">
+        </Link>
+        <nav className="flex items-center space-x-6">
           {user ? (
             <>
               <Link
@@ -187,8 +187,40 @@ const Navbar = () => {
                 Academic Emails
               </Link>
             </>
-          ) : null}
-          {renderAuthLinks()}
+          ) :
+          <>
+            <Link
+                to="/"
+                className={`text-sm font-medium ${
+                  location.pathname === "/"
+                    ? "text-blue-600"
+                    : "text-gray-600 hover:text-blue-600 transition-colors"
+                }`}
+              >
+                Home
+              </Link>
+              <Link
+                to="/signup"
+                className={`text-sm font-medium ${
+                  location.pathname === "/"
+                    ? "text-blue-600"
+                    : "text-gray-600 hover:text-blue-600 transition-colors"
+                }`}
+              >
+                Sign Up
+              </Link>
+              <Link
+                to="/login"
+                className={`text-sm font-medium ${
+                  location.pathname === "/"
+                    ? "text-blue-600"
+                    : "text-gray-600 hover:text-blue-600 transition-colors"
+                }`}
+              >
+                Login
+              </Link>
+          </>}
+          {/* {renderAuthLinks()} */}
           {renderProfileMenu()}
         </nav>
       </div>

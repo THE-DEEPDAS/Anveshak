@@ -53,30 +53,37 @@ export const AppProvider = ({ children }) => {
 
     fetchUserData();
   }, [user]);
-
   useEffect(() => {
+    let isMounted = true;
     const initializeAuth = async () => {
       try {
         const currentUser = await getCurrentUser();
-        if (currentUser) {
-          setUser(currentUser);
+        if (isMounted) {
+          if (currentUser) {
+            setUser(currentUser);
+          } else {
+            // Handle unauthenticated state only when mounting
+            const publicPaths = ['/login', '/signup', '/verify', '/'];
+            if (!publicPaths.some(path => location.pathname.startsWith(path))) {
+              window.location.href = "/";
+            }
+          }
+          setLoading(false);
         }
       } catch (error) {
         console.error("Error initializing auth:", error);
-        if (
-          !location.pathname.startsWith("/login") &&
-          !location.pathname.startsWith("/signup") &&
-          !location.pathname.startsWith("/verify")
-        ) {
-          window.location.href = "/";
+        if (isMounted) {
+          setLoading(false);
         }
-      } finally {
-        setLoading(false);
       }
     };
 
     initializeAuth();
-  }, [location.pathname]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Only run on mount
 
   // Fetch user emails when user is authenticated
   useEffect(() => {
