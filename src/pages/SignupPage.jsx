@@ -18,13 +18,14 @@ const SignupPage = () => {
     setErrors({});
     setIsSubmitting(true);
 
-    try {
-      const response = await register({ name, email, password });
+    try {      const response = await register({ name, email, password });
       showToast(
-        "Registration successful! Please check your email for verification.",
+        "Registration successful! Please enter the verification code sent to your email.",
         "success"
       );
-      setTimeout(() => navigate("/login"), 3000);
+      // Store email in sessionStorage for verification page
+      sessionStorage.setItem("verificationEmail", email);
+      navigate("/verify-email");
     } catch (err) {
       const errorMessage = err.response?.data?.message || "Signup failed";
       setErrors({

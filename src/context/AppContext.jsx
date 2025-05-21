@@ -33,6 +33,68 @@ export const AppProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { showToast } = useToast();
+  // List of public routes that don't require auth
+  const publicRoutes = ["/login", "/signup", "/verify-email", "/"];
+  // Fetch resume data when user logs in
+  useEffect(() => {
+    let isMounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        // Special handling for verification page
+        const currentPath = window.location.pathname;
+        if (currentPath === "/verify-email") {
+          const verificationEmail = sessionStorage.getItem("verificationEmail");
+          if (verificationEmail) {
+            // Allow access to verification page if we have a pending verification
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Check if we're on a public route
+        if (publicRoutes.includes(currentPath)) {
+          setLoading(false);
+          return;
+        }
+
+        // For protected routes, verify authentication
+        try {
+          const currentUser = await getCurrentUser();
+          if (isMounted) {
+            if (currentUser) {
+              setUser(currentUser);
+            } else {
+              // No user found, clear state and redirect if needed
+              setUser(null);
+              if (!publicRoutes.includes(currentPath) && currentPath !== "/verify-email") {
+                navigate("/login");
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Auth check failed:", error);
+          if (isMounted) {
+            setUser(null);
+            // Only redirect if not on a public route
+            if (!publicRoutes.includes(currentPath)) {
+              navigate("/login");
+            }
+          }
+        }
+      } finally{
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Only run on mount
 
   // Fetch resume data when user logs in
   useEffect(() => {
@@ -50,40 +112,8 @@ export const AppProvider = ({ children }) => {
         }
       }
     };
-
     fetchUserData();
   }, [user]);
-  useEffect(() => {
-    let isMounted = true;
-    const initializeAuth = async () => {
-      try {
-        const currentUser = await getCurrentUser();
-        if (isMounted) {
-          if (currentUser) {
-            setUser(currentUser);
-          } else {
-            // Handle unauthenticated state only when mounting
-            const publicPaths = ['/login', '/signup', '/verify', '/', '/verify/']; // Make sure /verify/* paths are allowed
-            if (!publicPaths.some(path => location.pathname.startsWith(path))) {
-              window.location.href = "/";
-            }
-          }
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error("Error initializing auth:", error);
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    initializeAuth();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []); // Only run on mount
 
   // Fetch user emails when user is authenticated
   useEffect(() => {

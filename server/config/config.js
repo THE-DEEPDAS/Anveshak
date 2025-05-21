@@ -156,6 +156,14 @@ const getMongoDBUri = () => {
   }
 };
 
+// Get backend URL based on environment
+const getBackendUrl = () => {
+  if (process.env.NODE_ENV === 'production') {
+    return process.env.BACKEND_URL || 'https://anveshak-4md5.onrender.com';
+  }
+  return 'http://localhost:5000';
+};
+
 // Export configuration
 export const config = {
   email: {
@@ -182,6 +190,7 @@ export const config = {
   server: {
     port: parseInt(process.env.PORT, 10) || 5000,
     nodeEnv: process.env.NODE_ENV || "development",
+    url: getBackendUrl(),
   },
   frontend: {
     url: process.env.FRONTEND_URL || "http://localhost:5173",

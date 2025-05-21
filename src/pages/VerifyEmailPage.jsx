@@ -1,44 +1,47 @@
-import React, { useEffect, useState, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { verifyEmail } from "../services/authService";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { verifyEmailCode, resendVerificationCode } from "../services/authService";
 import Button from "../components/ui/Button";
 import { useToast } from "../components/ui/Toaster";
 
 const VerifyEmailPage = () => {
-  const { token } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const [status, setStatus] = useState("pending"); // pending, verifying, success, or error
-  const [isNavigating, setIsNavigating] = useState(false);
-
-  const verify = useCallback(async () => {
-    if (status !== "pending") return; // Prevent multiple verification attempts
-
-    setStatus("verifying");
-    try {
-      const response = await verifyEmail(token);
-      setStatus("success");
-      showToast("Email verified successfully! Please log in.", "success");
-    } catch (error) {
-      setStatus("error");
-      const errorMessage =
-        error.response?.data?.message || "Email verification failed";
-      showToast(errorMessage, "error");
-    }
-  }, [token, showToast, status]);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [email, setEmail] = useState("");
 
   useEffect(() => {
-    if (token && status === "pending") {
-      verify();
+    // Get email from sessionStorage
+    const storedEmail = sessionStorage.getItem("verificationEmail");
+    if (!storedEmail) {
+      navigate("/login");
+      return;
     }
-  }, [token, verify, status]);
+    setEmail(storedEmail);
+  }, [navigate]);
 
-  const handleRedirect = (path) => {
-    if (isNavigating) return;
-    setIsNavigating(true);
-    navigate(path);
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    if (!verificationCode.trim()) {
+      showToast("Please enter the verification code", "error");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await verifyEmailCode(email, verificationCode);
+      showToast("Email verified successfully! Please log in.", "success");
+      sessionStorage.removeItem("verificationEmail"); // Clean up
+      setTimeout(() => navigate("/login"), 2000);
+    } catch (error) {
+      const errorMessage = 
+        error.response?.data?.message || "Verification failed";
+      showToast(errorMessage, "error");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
-
   return (
     <div className="container mx-auto px-4 py-10">
       <div className="max-w-md mx-auto bg-white p-6 rounded-lg shadow-md text-center">
@@ -46,85 +49,52 @@ const VerifyEmailPage = () => {
           Email Verification
         </h1>
 
-        {status === "pending" && (
-          <p className="text-gray-600">Preparing verification...</p>
-        )}
+        <p className="text-gray-600 mb-6">
+          Please enter the verification code sent to your email: <br />
+          <span className="font-semibold">{email}</span>
+        </p>
 
-        {status === "verifying" && (
+        <form onSubmit={handleVerify} className="space-y-4">
           <div>
-            <p className="text-gray-600 mb-4">
-              Verifying your email address...
-            </p>
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <input
+              type="text"
+              value={verificationCode}
+              onChange={(e) => setVerificationCode(e.target.value)}
+              placeholder="Enter 6-digit code"
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              maxLength="6"              pattern="[0-9]{6}"
+            />
           </div>
-        )}
 
-        {status === "success" && (
-          <div>
-            <div className="mb-6">
-              <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                <svg
-                  className="w-6 h-6 text-green-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M5 13l4 4L19 7"
-                  ></path>
-                </svg>
-              </div>
-              <p className="text-gray-600">
-                Your email has been verified successfully!
-              </p>
-            </div>
-            <Button
-              variant="primary"
-              onClick={() => handleRedirect("/login")}
-              className="w-full"
-              disabled={isNavigating}
+          <Button
+            type="submit"
+            className="w-full"
+            isLoading={isSubmitting}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Verifying..." : "Verify Email"}
+          </Button>
+        </form>
+
+        <div className="mt-4 text-sm">
+          <p className="text-gray-600">
+            Didn't receive the code?{" "}
+            <button
+              type="button"              onClick={async () => {
+                try {
+                  await resendVerificationCode(email);
+                  showToast("Verification code resent to your email", "success");
+                } catch (error) {
+                  showToast(error.response?.data?.message || "Failed to resend code", "error");
+                }
+              }}
+              className="text-blue-500 hover:text-blue-600"
+              disabled={isSubmitting}
             >
-              {isNavigating ? "Redirecting..." : "Proceed to Login"}
-            </Button>
-          </div>
-        )}
-
-        {status === "error" && (
-          <div>
-            <div className="mb-6">
-              <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-                <svg
-                  className="w-6 h-6 text-red-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  ></path>
-                </svg>
-              </div>
-              <p className="text-gray-600">
-                Sorry, we couldn't verify your email. The verification link may
-                be invalid or expired.
-              </p>
-            </div>
-            <Button
-              variant="primary"
-              onClick={() => handleRedirect("/signup")}
-              className="w-full"
-              disabled={isNavigating}
-            >
-              {isNavigating ? "Redirecting..." : "Back to Sign Up"}
-            </Button>
-          </div>
-        )}
+              Resend Code
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   );

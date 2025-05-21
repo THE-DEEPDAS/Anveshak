@@ -143,21 +143,21 @@ export const sendEmail = async ({ to, subject, text, cc, bcc, replyTo }) => {
   }
 };
 
-// Send verification email with improved format
-export const sendVerificationEmail = async (to, verificationToken, origin) => {  // Use backend URL for direct verification
-  const baseUrl = process.env.BACKEND_URL || "http://localhost:5000";
-  const verificationUrl = `${baseUrl}/api/auth/verify/${verificationToken}`;
-  const subject = "Email Verification";
-  const text = `Thank you for signing up! Please click the link below to verify your email address:
+// Send verification email with code
+export const sendVerificationEmail = async (to, verificationCode) => {
+  const subject = "Verify Your Email";
+  const text = `Thank you for signing up! Your verification code is:
 
-${verificationUrl}
+${verificationCode}
 
-This link will expire in 24 hours.
+This code will expire in 30 minutes.
+
+Please enter this code in the verification page to complete your registration.
 
 If you did not sign up for an account, please ignore this email.
 
 Best regards,
-The Anveshak  Team`;
+The Anveshak Team`;
 
   return sendEmail({ to, subject, text });
 };

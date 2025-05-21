@@ -127,3 +127,38 @@ export const resetPassword = async (token, password) => {
     throw error.response?.data || error;
   }
 };
+
+export const verifyEmailCode = async (email, code) => {
+  try {
+    const response = await axios.post(`${API_ENDPOINTS.auth}/verify-code`, {
+      email,
+      code,
+    });
+    return response.data;
+  } catch (error) {
+    throw {
+      response: {
+        data: {
+          message: error.response?.data?.message || "Verification failed",
+        },
+      },
+    };
+  }
+};
+
+export const resendVerificationCode = async (email) => {
+  try {
+    const response = await axios.post(
+      `${API_ENDPOINTS.auth}/resend-verification`,
+      {
+        email,
+      }
+    );
+    return response.data;
+  } catch (error) {
+    const message =
+      error.response?.data?.message ||
+      "Failed to resend verification code";
+    throw { response: { data: { message } } };
+  }
+};

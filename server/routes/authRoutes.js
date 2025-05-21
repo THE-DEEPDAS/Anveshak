@@ -36,29 +36,25 @@ router.post("/register", async (req, res) => {
     let user = await User.findOne({ email });
     if (user) {
       return res.status(400).json({ message: "User already exists" });
-    }
-
-    // Create verification token
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    }    // Create verification code (6 digits)
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationCodeExpiry = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
 
     // Create user
     user = new User({
       name,
       email,
       password, // Password will be hashed by the pre-save hook
-      verificationToken,
-      verificationTokenExpiry,
+      verificationCode,
+      verificationCodeExpiry,
     });
 
     await user.save();
 
     // Get origin from request headers
-    const origin = req.get("origin");
-
-    // Send verification email
+    const origin = req.get("origin");    // Send verification email with code
     try {
-      await sendVerificationEmail(email, verificationToken, origin);
+      await sendVerificationEmail(email, verificationCode);
     } catch (emailError) {
       console.error("Error sending verification email:", emailError);
       // Don't fail registration if email fails, but log it
@@ -78,141 +74,47 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// Verify email - add verifyEmailLimiter
-router.get("/verify/:token", verifyEmailLimiter, async (req, res) => {
+// Verify email with code
+router.post("/verify-code", verifyEmailLimiter, async (req, res) => {
   try {
-    const user = await User.findOne({
-      verificationToken: req.params.token,
-      verificationTokenExpiry: { $gt: Date.now() },
-    });
+    const { email, code } = req.body;
 
-    // Get login URL for the button
-    const loginUrl = process.env.FRONTEND_URLS 
-      ? process.env.FRONTEND_URLS.split(',')[0].trim() + '/login'
-      : process.env.FRONTEND_URL 
-        ? process.env.FRONTEND_URL + '/login'
-        : 'http://localhost:5173/login';
-
-    // Prepare response data
-    let title, message, buttonText, buttonUrl, bgColor;
-    
-    if (!user) {
-      title = 'Verification Failed';
-      message = 'The verification link is invalid or has expired. Please request a new verification link.';
-      buttonText = 'Go to Sign Up';
-      buttonUrl = loginUrl.replace('/login', '/signup');
-      bgColor = '#EF4444'; // red
-    } else if (user.isVerified) {
-      title = 'Already Verified';
-      message = 'Your email has already been verified. You can proceed to login.';
-      buttonText = 'Go to Login';
-      buttonUrl = loginUrl;
-      bgColor = '#10B981'; // green
-    } else {
-      // Verify the user
-      user.isVerified = true;
-      user.verificationToken = undefined;
-      user.verificationTokenExpiry = undefined;
-      await user.save();      // Send confirmation email
-      await sendEmail({
-        to: user.email,
-        subject: "Email Verification Successful",
-        text: `Your email has been successfully verified! You can now log in to your account.
-
-Best regards,
-The Anveshak Team`
+    if (!email || !code) {
+      return res.status(400).json({ 
+        message: "Email and verification code are required" 
       });
-
-      title = 'Email Verified Successfully';
-      message = 'Your email has been verified. You can now log in to your account.';
-      buttonText = 'Go to Login';
-      buttonUrl = loginUrl;
-      bgColor = '#10B981'; // green
     }
 
-    // Send HTML response with proper styling and mobile responsiveness
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${title}</title>
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-              line-height: 1.6;
-              margin: 0;
-              padding: 20px;
-              min-height: 100vh;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              background-color: #f3f4f6;
-            }
-            .container {
-              max-width: 400px;
-              width: 100%;
-              padding: 2rem;
-              background: white;
-              border-radius: 8px;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-              text-align: center;
-            }
-            .icon {
-              width: 60px;
-              height: 60px;
-              background-color: ${bgColor};
-              border-radius: 50%;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              margin: 0 auto 1rem;
-              color: white;
-              font-size: 24px;
-            }
-            h1 {
-              color: #1f2937;
-              margin-bottom: 1rem;
-              font-size: 1.5rem;
-            }
-            p {
-              color: #4b5563;
-              margin-bottom: 1.5rem;
-            }
-            .button {
-              display: inline-block;
-              background-color: ${bgColor};
-              color: white;
-              padding: 0.75rem 1.5rem;
-              border-radius: 0.375rem;
-              text-decoration: none;
-              font-weight: 500;
-              transition: opacity 0.2s;
-            }
-            .button:hover {
-              opacity: 0.9;
-            }
-            @media (max-width: 480px) {
-              .container {
-                padding: 1.5rem;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="icon">${user && user.isVerified ? '✓' : '!'}</div>
-            <h1>${title}</h1>
-            <p>${message}</p>
-            <a href="${buttonUrl}" class="button">${buttonText}</a>
-          </div>
-        </body>
-      </html>
-    `);
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+      verificationCode: code,
+      verificationCodeExpiry: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ 
+        message: "Invalid or expired verification code" 
+      });
+    }
+
+    // Update user verification status
+    user.isVerified = true;
+    user.verificationCode = undefined;
+    user.verificationCodeExpiry = undefined;
+    await user.save();
+
+    return res.status(200).json({
+      message: "Email verified successfully",
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        isVerified: true
+      }
+    });
   } catch (error) {
     console.error("Verification error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -385,6 +287,48 @@ router.post("/logout", (req, res) => {
     maxAge: 0,
   });
   res.json({ message: "Logged out successfully" });
+});
+
+// Resend verification code
+router.post("/resend-verification", verifyEmailLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({ message: "Email is already verified" });
+    }
+
+    // Generate new verification code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationCodeExpiry = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+
+    // Update user with new code
+    user.verificationCode = verificationCode;
+    user.verificationCodeExpiry = verificationCodeExpiry;
+    await user.save();
+
+    // Send new verification email
+    try {
+      await sendVerificationEmail(email, verificationCode);
+      res.json({ message: "Verification code resent successfully" });
+    } catch (emailError) {
+      console.error("Error sending verification email:", emailError);
+      res.status(500).json({ message: "Error sending verification email" });
+    }
+  } catch (error) {
+    console.error("Resend verification error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
 export default router;
