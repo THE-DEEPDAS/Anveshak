@@ -80,49 +80,136 @@ router.post("/register", async (req, res) => {
 
 // Verify email - add verifyEmailLimiter
 router.get("/verify/:token", verifyEmailLimiter, async (req, res) => {
-  try {    const user = await User.findOne({
+  try {
+    const user = await User.findOne({
       verificationToken: req.params.token,
       verificationTokenExpiry: { $gt: Date.now() },
     });
 
-    // Get the appropriate frontend URL
-    const getFrontendUrl = () => {
-      if (process.env.FRONTEND_URLS) {
-        return process.env.FRONTEND_URLS.split(',')[0].trim(); // Use the first URL from the list
-      }
-      if (process.env.FRONTEND_URL) {
-        return process.env.FRONTEND_URL;
-      }
-      return "http://localhost:5173";
-    };
+    // Get login URL for the button
+    const loginUrl = process.env.FRONTEND_URLS 
+      ? process.env.FRONTEND_URLS.split(',')[0].trim() + '/login'
+      : process.env.FRONTEND_URL 
+        ? process.env.FRONTEND_URL + '/login'
+        : 'http://localhost:5173/login';
 
-    const baseUrl = getFrontendUrl();
-    const loginUrl = `${baseUrl}/login`;
-    const errorUrl = `${baseUrl}/signup`;
-
+    // Prepare response data
+    let title, message, buttonText, buttonUrl, bgColor;
+    
     if (!user) {
-      return res.redirect(`${errorUrl}?error=invalid_token`);
-    }
-
-    if (user.isVerified) {
-      return res.redirect(`${loginUrl}?message=already_verified`);
-    }
-
-    user.isVerified = true;
-    user.verificationToken = undefined;
-    user.verificationTokenExpiry = undefined;
-    await user.save();    // Send confirmation email
-    await sendEmail({
-      to: user.email,
-      subject: "Email Verification Successful",
-      text: `Your email has been successfully verified! You can now log in to your account at ${process.env.FRONTEND_URL || 'http://localhost:5173'}.
+      title = 'Verification Failed';
+      message = 'The verification link is invalid or has expired. Please request a new verification link.';
+      buttonText = 'Go to Sign Up';
+      buttonUrl = loginUrl.replace('/login', '/signup');
+      bgColor = '#EF4444'; // red
+    } else if (user.isVerified) {
+      title = 'Already Verified';
+      message = 'Your email has already been verified. You can proceed to login.';
+      buttonText = 'Go to Login';
+      buttonUrl = loginUrl;
+      bgColor = '#10B981'; // green
+    } else {
+      // Verify the user
+      user.isVerified = true;
+      user.verificationToken = undefined;
+      user.verificationTokenExpiry = undefined;
+      await user.save();      // Send confirmation email
+      await sendEmail({
+        to: user.email,
+        subject: "Email Verification Successful",
+        text: `Your email has been successfully verified! You can now log in to your account.
 
 Best regards,
 The Anveshak Team`
-    });
+      });
 
-    // Redirect to login page with success message
-    res.redirect(`${loginUrl}?verified=true`);
+      title = 'Email Verified Successfully';
+      message = 'Your email has been verified. You can now log in to your account.';
+      buttonText = 'Go to Login';
+      buttonUrl = loginUrl;
+      bgColor = '#10B981'; // green
+    }
+
+    // Send HTML response with proper styling and mobile responsiveness
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>${title}</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              line-height: 1.6;
+              margin: 0;
+              padding: 20px;
+              min-height: 100vh;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              background-color: #f3f4f6;
+            }
+            .container {
+              max-width: 400px;
+              width: 100%;
+              padding: 2rem;
+              background: white;
+              border-radius: 8px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+              text-align: center;
+            }
+            .icon {
+              width: 60px;
+              height: 60px;
+              background-color: ${bgColor};
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              margin: 0 auto 1rem;
+              color: white;
+              font-size: 24px;
+            }
+            h1 {
+              color: #1f2937;
+              margin-bottom: 1rem;
+              font-size: 1.5rem;
+            }
+            p {
+              color: #4b5563;
+              margin-bottom: 1.5rem;
+            }
+            .button {
+              display: inline-block;
+              background-color: ${bgColor};
+              color: white;
+              padding: 0.75rem 1.5rem;
+              border-radius: 0.375rem;
+              text-decoration: none;
+              font-weight: 500;
+              transition: opacity 0.2s;
+            }
+            .button:hover {
+              opacity: 0.9;
+            }
+            @media (max-width: 480px) {
+              .container {
+                padding: 1.5rem;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="icon">${user && user.isVerified ? '✓' : '!'}</div>
+            <h1>${title}</h1>
+            <p>${message}</p>
+            <a href="${buttonUrl}" class="button">${buttonText}</a>
+          </div>
+        </body>
+      </html>
+    `);
   } catch (error) {
     console.error("Verification error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
