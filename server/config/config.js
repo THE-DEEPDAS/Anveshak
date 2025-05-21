@@ -18,24 +18,40 @@ cloudinary.config({
   secure: true,
 });
 
-// Determine allowed origins based on environment
-const allowedOrigins =
-  process.env.NODE_ENV === "production"
-    ? [process.env.FRONTEND_URL, "https://anveshak.vercel.app"]
-    : ["http://localhost:5173", "http://localhost:3000"];
+// Get allowed origins from environment variables
+const getAllowedOrigins = () => {
+  if (process.env.FRONTEND_URLS) {
+    return process.env.FRONTEND_URLS.split(',').map(url => url.trim());
+  }
+  if (process.env.FRONTEND_URL) {
+    return [process.env.FRONTEND_URL];
+  }
+  return ["http://localhost:5173"];
+};
 
 // CORS Configuration
 const corsConfig = {
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
+  origin: function(origin, callback) {
+    const allowedOrigins = getAllowedOrigins();
+    
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, origin);
     } else {
-      callback(new Error("Not allowed by CORS"));
+      console.warn(`Rejected origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  exposedHeaders: ["Set-Cookie"],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
 
 // Validate required configurations

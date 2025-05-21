@@ -31,20 +31,12 @@ const __dirname = dirname(__filename);
 const app = express();
 
 // Apply security middleware
-app.use(cors(config.corsConfig));
+app.use(cors(config.cors));
 app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(morgan('dev'));
-
-// CORS configuration - allow credentials and specific origins
-app.use(cors({
-  origin: config.cors.origin,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
 
 // Increase timeout for all routes
 app.use((req, res, next) => {
