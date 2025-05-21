@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"cd server && npm run dev\" \"vite\"",
+    "dev": "concurrently \"cd server && npx nodemon index.js\" \"vite\"",
     "build": "vite build",
     "start": "cd server && npm run start",
     "postinstall": "cd server && npm install",

@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js",
+    "dev": "npx nodemon index.js",
     "init-db": "node scripts/initAcademicDb.js",
     "init-academic-db": "node scripts/initAcademicDb.js"
   },

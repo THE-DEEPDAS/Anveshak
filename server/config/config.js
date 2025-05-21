@@ -25,7 +25,8 @@ const getAllowedOrigins = () => {
     "http://localhost:3000",
     "https://anveshak-git-main-the-deepdas-projects.vercel.app",
     "https://anveshak-the-deepdas-projects.vercel.app",
-    "https://anveshak.vercel.app"
+    "https://anveshak.vercel.app",
+    "https://anveshak-8dq6lnxy9-the-deepdas-projects.vercel.app"
   ];
 
   let origins = [];
