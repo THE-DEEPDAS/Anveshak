@@ -140,7 +140,8 @@ const Navbar = () => {
           </div>
         )}
       </div>
-    );  };
+    );
+  };
 
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
@@ -161,7 +162,7 @@ const Navbar = () => {
                 className={`text-sm font-medium ${
                   location.pathname === "/"
                     ? "text-blue-600"
-                    : "text-gray-600 hover:text-blue-600 transition-colors"
+                    : "text-black hover:text-blue-500 transition-colors"
                 }`}
               >
                 Home
@@ -171,7 +172,7 @@ const Navbar = () => {
                 className={`text-sm font-medium ${
                   location.pathname === "/dashboard"
                     ? "text-blue-600"
-                    : "text-gray-600 hover:text-blue-600 transition-colors"
+                    : "text-black hover:text-blue-500 transition-colors"
                 }`}
               >
                 Dashboard
@@ -181,20 +182,20 @@ const Navbar = () => {
                 className={`text-sm font-medium ${
                   location.pathname === "/academic-emails"
                     ? "text-blue-600"
-                    : "text-gray-600 hover:text-blue-600 transition-colors"
+                    : "text-black hover:text-blue-500 transition-colors"
                 }`}
               >
                 Academic Emails
               </Link>
             </>
-          ) :
-          <>
-            <Link
+          ) : (
+            <>
+              <Link
                 to="/"
                 className={`text-sm font-medium ${
                   location.pathname === "/"
                     ? "text-blue-600"
-                    : "text-gray-600 hover:text-blue-600 transition-colors"
+                    : "text-black hover:text-blue-500 transition-colors"
                 }`}
               >
                 Home
@@ -202,9 +203,9 @@ const Navbar = () => {
               <Link
                 to="/signup"
                 className={`text-sm font-medium ${
-                  location.pathname === "/"
+                  location.pathname === "/signup"
                     ? "text-blue-600"
-                    : "text-gray-600 hover:text-blue-600 transition-colors"
+                    : "text-black hover:text-blue-500 transition-colors"
                 }`}
               >
                 Sign Up
@@ -212,15 +213,15 @@ const Navbar = () => {
               <Link
                 to="/login"
                 className={`text-sm font-medium ${
-                  location.pathname === "/"
+                  location.pathname === "/login"
                     ? "text-blue-600"
-                    : "text-gray-600 hover:text-blue-600 transition-colors"
+                    : "text-black hover:text-blue-500 transition-colors"
                 }`}
               >
                 Login
               </Link>
-          </>}
-          {/* {renderAuthLinks()} */}
+            </>
+          )}
           {renderProfileMenu()}
         </nav>
       </div>
