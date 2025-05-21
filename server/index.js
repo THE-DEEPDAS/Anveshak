@@ -31,13 +31,28 @@ const __dirname = dirname(__filename);
 const app = express();
 
 // Apply security middleware
-// Enable CORS with configuration
+app.use(cors(config.cors));
+
+// Additional CORS headers for preflight requests
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Credentials', 'true');
+  const origin = req.get('origin');
+  const allowedOrigins = config.cors.origin;
+  
+  if (origin && (typeof allowedOrigins === 'function' ? true : allowedOrigins.includes(origin))) {
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  }
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  
   next();
 });
 
-app.use(cors(config.cors));
 app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

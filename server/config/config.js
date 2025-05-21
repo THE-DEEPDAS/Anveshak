@@ -22,27 +22,35 @@ cloudinary.config({
 const getAllowedOrigins = () => {
   const defaultOrigins = [
     "http://localhost:5173",
+    "http://localhost:3000",
     "https://anveshak-git-main-the-deepdas-projects.vercel.app",
     "https://anveshak-the-deepdas-projects.vercel.app",
     "https://anveshak.vercel.app"
   ];
 
+  let origins = [];
+  
+  // Add origins from environment variables
   if (process.env.FRONTEND_URLS) {
     const envOrigins = process.env.FRONTEND_URLS.split(',').map(url => url.trim());
-    return [...new Set([...defaultOrigins, ...envOrigins])];
+    origins.push(...envOrigins);
   }
+  
   if (process.env.FRONTEND_URL) {
-    return [...new Set([...defaultOrigins, process.env.FRONTEND_URL])];
+    origins.push(process.env.FRONTEND_URL);
   }
-  return defaultOrigins;
+  
+  // Combine with defaults and remove duplicates
+  origins = [...new Set([...defaultOrigins, ...origins])];
+  
+  console.log('Configured CORS origins:', origins);
+  return origins;
 };
 
 // CORS Configuration
 const corsConfig = {
   origin: function(origin, callback) {
     const allowedOrigins = getAllowedOrigins();
-    console.log('Received request from origin:', origin);
-    console.log('Allowed origins:', allowedOrigins);
     
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) {
@@ -50,12 +58,17 @@ const corsConfig = {
     }
     
     if (allowedOrigins.includes(origin)) {
-      callback(null, origin);
+      callback(null, true);
     } else {
       console.warn(`Rejected origin: ${origin}, not in allowed list:`, allowedOrigins);
       callback(new Error('Not allowed by CORS'));
     }
   },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
