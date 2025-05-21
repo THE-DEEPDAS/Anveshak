@@ -78,37 +78,21 @@ export const logout = async () => {
 
 export const getCurrentUser = async () => {
   try {
-    // First try to get user from localStorage
-    const storedUser = localStorage.getItem("user");
-    const token = localStorage.getItem("token");
-
-    if (storedUser && token) {
-      // Set the auth header
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-
-      // Verify the stored user is still valid
-      const response = await axios.get(`${API_ENDPOINTS.auth}/me`);
-      if (response.data) {
-        return response.data;
-      }
-    }
-
-    // If we get here, either there's no stored user or the token is invalid
-    // Try to get user data using HTTP-only cookie
+    // Get user data from /me endpoint
     const response = await axios.get(`${API_ENDPOINTS.auth}/me`);
     if (response.data) {
       localStorage.setItem("user", JSON.stringify(response.data));
       return response.data;
     }
-
     return null;
   } catch (error) {
-    console.error("Get current user error:", error);
-    // Clear stored data if there's an error
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
-    delete axios.defaults.headers.common["Authorization"];
-    return null;
+    if (error.response?.status === 401) {
+      // Clear invalid session
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      delete axios.defaults.headers.common["Authorization"];
+    }
+    throw error;
   }
 };
 

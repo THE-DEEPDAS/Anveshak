@@ -129,17 +129,7 @@ const ResumeAnalysis = () => {
           <span>Analyzing resume contents... This may take a moment.</span>
         </div>
       ) : (
-        <>
-          {resume?.text && (
-            <div className="mb-4 p-4 bg-gray-50 rounded">
-              <h3 className="font-semibold mb-2">Extracted Text</h3>
-              <p className="whitespace-pre-wrap text-sm text-gray-600">
-                {resume.text}
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-6">
+        <>          <div className="space-y-6">
             <div className="border rounded p-4">
               <div className="flex justify-between items-center mb-2">
                 <h3 className="font-semibold">Skills</h3>

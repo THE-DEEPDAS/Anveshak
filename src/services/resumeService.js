@@ -127,6 +127,23 @@ export const deleteSkill = async (resumeId, skillIndex) => {
   }
 };
 
+export const getUserResumes = async (userId) => {
+  try {
+    const response = await axios.get(
+      `${API_ENDPOINTS.resumes}/user/${userId}`,
+      {
+        validateStatus: function (status) {
+          return status < 500; // Don't throw for 404s
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching user resumes:", error);
+    return [];
+  }
+};
+
 // Mock function for development
 export const getMockResumeData = () => {
   return {

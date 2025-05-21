@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   updateResume as updateResumeService,
   deleteSkill as deleteSkillService,
+  getUserResumes,
 } from "../services/resumeService";
 import { useToast } from "../components/ui/Toaster";
 
@@ -32,6 +33,26 @@ export const AppProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { showToast } = useToast();
+
+  // Fetch resume data when user logs in
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (user?._id) {
+        try {
+          // Get all user's resumes
+          const resumes = await getUserResumes(user._id);
+          if (resumes?.length > 0) {
+            // Set the most recent resume
+            setResume(resumes[0]);
+          }
+        } catch (error) {
+          console.error("Error fetching resume:", error);
+        }
+      }
+    };
+
+    fetchUserData();
+  }, [user]);
 
   useEffect(() => {
     const initializeAuth = async () => {

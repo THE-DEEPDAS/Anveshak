@@ -53,9 +53,12 @@ router.post("/register", async (req, res) => {
 
     await user.save();
 
+    // Get origin from request headers
+    const origin = req.get("origin");
+
     // Send verification email
     try {
-      await sendVerificationEmail(email, verificationToken);
+      await sendVerificationEmail(email, verificationToken, origin);
     } catch (emailError) {
       console.error("Error sending verification email:", emailError);
       // Don't fail registration if email fails, but log it
@@ -161,16 +164,22 @@ router.post("/forgot-password", async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // Generate reset token
     const resetToken = crypto.randomBytes(32).toString("hex");
     user.resetPasswordToken = resetToken;
-    user.resetPasswordTokenExpiry = Date.now() + 3600000; // 1 hour
+    user.resetPasswordExpiry = Date.now() + 3600000; // 1 hour
+
     await user.save();
 
-    await sendPasswordResetEmail(email, resetToken);
+    // Get origin from request headers
+    const origin = req.get("origin");
+
+    // Send password reset email
+    await sendPasswordResetEmail(email, resetToken, origin);
 
     res.json({ message: "Password reset email sent" });
   } catch (error) {
-    console.error("Password reset request error:", error);
+    console.error("Forgot password error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 });

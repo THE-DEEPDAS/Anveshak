@@ -144,8 +144,11 @@ export const sendEmail = async ({ to, subject, text, cc, bcc, replyTo }) => {
 };
 
 // Send verification email with improved format
-export const sendVerificationEmail = async (to, verificationToken) => {
-  const verificationUrl = `${config.frontend.url}/verify/${verificationToken}`;
+export const sendVerificationEmail = async (to, verificationToken, origin) => {
+  // Check if the origin is in allowed URLs, otherwise use default
+  const allowedUrls = process.env.FRONTEND_URLS ? process.env.FRONTEND_URLS.split(',') : [process.env.FRONTEND_URL];
+  const baseUrl = allowedUrls.includes(origin) ? origin : allowedUrls[0];
+  const verificationUrl = `${baseUrl}/verify/${verificationToken}`;
   const subject = "Email Verification";
   const text = `Thank you for signing up! Please verify your email by clicking the link below:
 
@@ -162,8 +165,11 @@ The Cold Mailer Team`;
 };
 
 // Send password reset email with improved format
-export const sendPasswordResetEmail = async (to, resetToken) => {
-  const resetUrl = `${config.frontend.url}/reset-password/${resetToken}`;
+export const sendPasswordResetEmail = async (to, resetToken, origin) => {
+  // Check if the origin is in allowed URLs, otherwise use default
+  const allowedUrls = process.env.FRONTEND_URLS ? process.env.FRONTEND_URLS.split(',') : [process.env.FRONTEND_URL];
+  const baseUrl = allowedUrls.includes(origin) ? origin : allowedUrls[0];
+  const resetUrl = `${baseUrl}/reset-password/${resetToken}`;
   const subject = "Password Reset Request";
   const text = `You requested a password reset. Click the link below to reset your password:
 
