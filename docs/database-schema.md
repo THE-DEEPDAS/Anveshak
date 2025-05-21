@@ -1,10 +1,10 @@
 # Database Schema Documentation
 
-This document details the MongoDB database schema used by Cold Mailer, including all collections, their relationships, field types, and purpose.
+This document details the MongoDB database schema used by Anveshak , including all collections, their relationships, field types, and purpose.
 
 ## Overview
 
-Cold Mailer uses MongoDB as its primary database. The schema is designed around the following core collections:
+Anveshak  uses MongoDB as its primary database. The schema is designed around the following core collections:
 
 - **Users** - User accounts and authentication information
 - **Resumes** - Resume documents and parsed content

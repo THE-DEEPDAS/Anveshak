@@ -16,7 +16,7 @@ const transporter = nodemailer.createTransport({
 const mailOptions = {
   from: process.env.EMAIL_USER, // sender address
   to: process.env.EMAIL_USER, // recipient address (use your own email for testing)
-  subject: "Test Email from Cold Mailer", // Subject line
+  subject: "Test Email from Anveshak ", // Subject line
   text: "This is a test email to verify the email credentials.", // plain text body
 };
 

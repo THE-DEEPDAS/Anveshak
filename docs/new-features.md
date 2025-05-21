@@ -1,8 +1,8 @@
-# Cold Mailer - New Features Documentation
+# Anveshak  - New Features Documentation
 
 ## 1. Email History Features
 
-The Cold Mailer application now includes functionality to store and display sent emails with detailed metadata. Users can view their email history and access detailed information about each email.
+The Anveshak  application now includes functionality to store and display sent emails with detailed metadata. Users can view their email history and access detailed information about each email.
 
 ### Features Added:
 

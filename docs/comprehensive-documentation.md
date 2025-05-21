@@ -1,4 +1,4 @@
-# Cold Mailer - Comprehensive Documentation
+# Anveshak  - Comprehensive Documentation
 
 ## Table of Contents
 
@@ -24,7 +24,7 @@
 
 ## Introduction
 
-Cold Mailer is a comprehensive platform designed to help job seekers generate personalized cold emails to potential employers and academic faculty. The system combines AI-powered resume parsing, company/faculty research, and personalized email generation to create highly tailored outreach communications.
+Anveshak  is a comprehensive platform designed to help job seekers generate personalized cold emails to potential employers and academic faculty. The system combines AI-powered resume parsing, company/faculty research, and personalized email generation to create highly tailored outreach communications.
 
 The platform serves two primary use cases:
 
@@ -33,7 +33,7 @@ The platform serves two primary use cases:
 
 ## Architecture Overview
 
-Cold Mailer is built using a modern MERN stack architecture:
+Anveshak  is built using a modern MERN stack architecture:
 
 - **Frontend**: React-based SPA with context-based state management
 - **Backend**: Node.js + Express RESTful API server
@@ -72,7 +72,7 @@ Server
 
 ### Resume Parsing Algorithms
 
-Cold Mailer implements three distinct resume parsing algorithms, each with its own strengths and use cases:
+Anveshak  implements three distinct resume parsing algorithms, each with its own strengths and use cases:
 
 #### 1. Simplified Parser (simplifiedResumeParser.js)
 
@@ -184,7 +184,7 @@ const prompt = `
 
 ### Email Generation Algorithms
 
-Cold Mailer utilizes generative AI to produce personalized email content with several specialized algorithms:
+Anveshak  utilizes generative AI to produce personalized email content with several specialized algorithms:
 
 #### 1. Company Research Email Generation
 
@@ -274,7 +274,7 @@ Specialized algorithm for generating personalized academic research collaboratio
 
 ### Company Research and Matching
 
-Cold Mailer implements a robust company matching system to connect candidates with relevant employers:
+Anveshak  implements a robust company matching system to connect candidates with relevant employers:
 
 **Algorithm Overview:**
 
@@ -316,7 +316,7 @@ Specialized algorithm for matching candidates with academic faculty:
 
 ### Resume Analysis
 
-Cold Mailer provides comprehensive resume analysis features:
+Anveshak  provides comprehensive resume analysis features:
 
 - **Automated Skill Extraction**: Identifies technical skills, technologies, and methodologies
 - **Experience Analysis**: Extracts and categorizes work history, roles, and achievements
@@ -335,7 +335,7 @@ Cold Mailer provides comprehensive resume analysis features:
 
 ### Company Research and Matching
 
-Cold Mailer identifies relevant companies based on candidate skills:
+Anveshak  identifies relevant companies based on candidate skills:
 
 - **Skill-Based Matching**: Finds companies using technologies in candidate's skill set
 - **Role-Based Targeting**: Focuses on companies with positions matching desired roles
@@ -353,7 +353,7 @@ Cold Mailer identifies relevant companies based on candidate skills:
 
 ### Email Generation
 
-Cold Mailer generates personalized cold emails for job applications:
+Anveshak  generates personalized cold emails for job applications:
 
 - **Company-Specific Personalization**: References company products, technologies, and culture
 - **Skill Matching**: Highlights candidate skills relevant to the company
@@ -373,7 +373,7 @@ Cold Mailer generates personalized cold emails for job applications:
 
 ### Academic Email Generation
 
-Cold Mailer generates personalized emails for academic research collaboration:
+Anveshak  generates personalized emails for academic research collaboration:
 
 - **Research Interest Alignment**: Matches candidate interests with faculty research areas
 - **Publication References**: Cites relevant faculty publications and research projects
@@ -392,7 +392,7 @@ Cold Mailer generates personalized emails for academic research collaboration:
 
 ### Email Management
 
-Cold Mailer provides comprehensive email campaign management:
+Anveshak  provides comprehensive email campaign management:
 
 - **Email History**: Tracks all generated and sent emails
 - **Status Tracking**: Monitors email status (draft, sent, replied)
@@ -534,7 +534,7 @@ Cold Mailer provides comprehensive email campaign management:
 
 ### JSON Parsing Enhancement
 
-Cold Mailer implements robust error handling for JSON parsing in AI responses:
+Anveshak  implements robust error handling for JSON parsing in AI responses:
 
 **Key Features:**
 
@@ -622,7 +622,7 @@ safetySettings: [
 
 ## Security Practices
 
-Cold Mailer implements several security best practices:
+Anveshak  implements several security best practices:
 
 - **JWT Authentication**: Secure token-based authentication
 - **Password Hashing**: Secure password storage with bcrypt

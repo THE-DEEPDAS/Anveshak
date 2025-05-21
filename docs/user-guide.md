@@ -1,6 +1,6 @@
-# Cold Mailer User Guide
+# Anveshak  User Guide
 
-This guide provides step-by-step instructions for using all features of the Cold Mailer application.
+This guide provides step-by-step instructions for using all features of the Anveshak  application.
 
 ## Table of Contents
 
@@ -16,7 +16,7 @@ This guide provides step-by-step instructions for using all features of the Cold
 
 ## Introduction
 
-Cold Mailer is a comprehensive platform that helps job seekers generate personalized cold emails to potential employers and academic faculty. The system combines AI-powered resume parsing, company/faculty research, and personalized email generation to create highly tailored outreach communications.
+Anveshak  is a comprehensive platform that helps job seekers generate personalized cold emails to potential employers and academic faculty. The system combines AI-powered resume parsing, company/faculty research, and personalized email generation to create highly tailored outreach communications.
 
 ### Key Features
 
@@ -30,7 +30,7 @@ Cold Mailer is a comprehensive platform that helps job seekers generate personal
 
 ### Creating an Account
 
-1. Navigate to the Cold Mailer homepage
+1. Navigate to the Anveshak  homepage
 2. Click "Sign Up" in the navigation menu
 3. Enter your full name, email address, and password
 4. Click "Create Account"
@@ -138,7 +138,7 @@ If the initial parsing results are incomplete:
 
 You have two options for sending emails:
 
-#### Sending through Cold Mailer
+#### Sending through Anveshak 
 
 1. After reviewing and editing emails, click "Send Emails"
 2. Confirm the sending action

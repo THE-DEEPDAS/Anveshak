@@ -1,6 +1,6 @@
 # Simplified Resume Parser Documentation
 
-The Cold Mailer application now includes a simplified yet effective resume parsing algorithm that focuses on extracting skills, experience, and projects from PDF resumes without requiring additional dependencies like pdf.js.
+The Anveshak  application now includes a simplified yet effective resume parsing algorithm that focuses on extracting skills, experience, and projects from PDF resumes without requiring additional dependencies like pdf.js.
 
 ## Overview
 

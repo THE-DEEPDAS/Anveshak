@@ -1,12 +1,12 @@
-# Cold Mailer Documentation
+# Anveshak  Documentation
 
-Welcome to the Cold Mailer documentation. This comprehensive set of documents provides detailed information about the system's architecture, features, APIs, and usage instructions.
+Welcome to the Anveshak  documentation. This comprehensive set of documents provides detailed information about the system's architecture, features, APIs, and usage instructions.
 
 ## Documentation Index
 
 ### User Documentation
 
-- [**User Guide**](./user-guide.md) - Complete guide for end users on how to use the Cold Mailer application
+- [**User Guide**](./user-guide.md) - Complete guide for end users on how to use the Anveshak  application
 - [**Installation and Setup**](./installation-setup.md) - Instructions for installing and configuring the application
 
 ### Technical Documentation
@@ -33,7 +33,7 @@ Welcome to the Cold Mailer documentation. This comprehensive set of documents pr
 
 ## System Architecture Overview
 
-Cold Mailer is built using a modern MERN stack (MongoDB, Express.js, React, Node.js) architecture with the following key components:
+Anveshak  is built using a modern MERN stack (MongoDB, Express.js, React, Node.js) architecture with the following key components:
 
 1. **Frontend Layer**
 
@@ -73,7 +73,7 @@ Cold Mailer is built using a modern MERN stack (MongoDB, Express.js, React, Node
 
 ## Contributing
 
-Before contributing to Cold Mailer, please review:
+Before contributing to Anveshak , please review:
 
 1. The code structure in the installation guide
 2. API documentation to understand existing endpoints

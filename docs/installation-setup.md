@@ -1,6 +1,6 @@
 # Installation and Environment Setup Instructions
 
-This document provides comprehensive instructions for setting up the Cold Mailer application development and production environments.
+This document provides comprehensive instructions for setting up the Anveshak  application development and production environments.
 
 ## System Requirements
 

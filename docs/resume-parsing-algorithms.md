@@ -2,7 +2,7 @@
 
 ## Overview
 
-Cold Mailer implements three complementary resume parsing algorithms, each with specific strengths and use cases. This document provides a technical deep dive into the implementation, algorithms, and optimization techniques used in each parser.
+Anveshak  implements three complementary resume parsing algorithms, each with specific strengths and use cases. This document provides a technical deep dive into the implementation, algorithms, and optimization techniques used in each parser.
 
 ## Table of Contents
 
@@ -395,7 +395,7 @@ async function getSkillsFromText(text) {
 
 ## Parsing Strategy Selection
 
-Cold Mailer uses a strategic approach to select the appropriate parsing algorithm:
+Anveshak  uses a strategic approach to select the appropriate parsing algorithm:
 
 ### Decision Factors
 

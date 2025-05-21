@@ -1,6 +1,6 @@
-# Cold Mailer Frontend Components Documentation
+# Anveshak  Frontend Components Documentation
 
-This document provides technical documentation for the frontend components of the Cold Mailer application.
+This document provides technical documentation for the frontend components of the Anveshak  application.
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@ This document provides technical documentation for the frontend components of th
 
 ## Architecture Overview
 
-Cold Mailer's frontend is built using React with a component-based architecture. It follows these key architectural principles:
+Anveshak 's frontend is built using React with a component-based architecture. It follows these key architectural principles:
 
 - **Component Encapsulation**: Each component has a specific responsibility
 - **Context-based State Management**: AppContext provides global state

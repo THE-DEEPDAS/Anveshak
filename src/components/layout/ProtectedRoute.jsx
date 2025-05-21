@@ -26,7 +26,7 @@ const ProtectedRoute = ({ children }) => {
   }
 
   // Special case: don't redirect to resume upload from these paths
-  const noRedirectPaths = ['/upload-resume', '/verify', '/onboarding'];
+  const noRedirectPaths = ['/upload-resume', '/verify', '/verify/', '/onboarding'];
   if (location.pathname && noRedirectPaths.some(path => location.pathname.startsWith(path))) {
     return children;
   }

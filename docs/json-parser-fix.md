@@ -2,7 +2,7 @@
 
 ## Summary of Changes
 
-We've successfully fixed the JSON parsing issues in the Cold Mailer application's email generation functionality. The primary issues were related to handling malformed or incomplete JSON responses from the language model.
+We've successfully fixed the JSON parsing issues in the Anveshak  application's email generation functionality. The primary issues were related to handling malformed or incomplete JSON responses from the language model.
 
 ## Implemented Changes
 

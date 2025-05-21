@@ -1,6 +1,6 @@
-# Cold Mailer API Documentation
+# Anveshak  API Documentation
 
-This document provides detailed documentation for all API endpoints in the Cold Mailer application, including request parameters, response formats, and examples.
+This document provides detailed documentation for all API endpoints in the Anveshak  application, including request parameters, response formats, and examples.
 
 ## Table of Contents
 

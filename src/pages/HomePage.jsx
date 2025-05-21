@@ -27,21 +27,21 @@ const HomePage = () => {
     /* For all those reading this, these are real, they are just hardcoded 😅 */
     {
       quote:
-        "As a drone enthusiast, I used Cold Mailer to reach out to Academic Institutions for collaboaration. I'm now collaborating with professors from IIT Bombay on my drone project.",
+        "As a drone enthusiast, I used Anveshak  to reach out to Academic Institutions for collaboaration. I'm now collaborating with professors from IIT Bombay on my drone project.",
       author: "Bodhini Jain",
       position: "CSE Student, SVNIT Surat",
       image: "https://randomuser.me/api/portraits/women/44.jpg",
     },
     {
       quote:
-        "The open-source nature of Cold Mailer allowed me to add features specific to the Indian job market. I now use it to help fellow students at SVNIT land internships.",
+        "The open-source nature of Anveshak  allowed me to add features specific to the Indian job market. I now use it to help fellow students at SVNIT land internships.",
       author: "Swapna K",
       position: "Software Developer, SVNIT Alumni",
       image: "https://randomuser.me/api/portraits/women/22.jpg",
     },
     {
       quote:
-        "I used Cold Mailer during my second year at SVNIT to connect with industry professionals. Within a month, I had three interview offers from top companies!",
+        "I used Anveshak  during my second year at SVNIT to connect with industry professionals. Within a month, I had three interview offers from top companies!",
       author: "Vikram Singh",
       position: "Machine Learning Engineer, SVNIT",
       image: "https://randomuser.me/api/portraits/men/28.jpg",
@@ -193,7 +193,7 @@ const HomePage = () => {
               Seamless Process
             </span>
             <h2 className="text-4xl font-bold mt-2 mb-4 text-gray-800">
-              How Cold Mailer Works
+              How Anveshak  Works
             </h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
               Our intelligent workflow combines resume parsing, AI matching, and
@@ -294,7 +294,7 @@ const HomePage = () => {
               Production-Grade Architecture
             </h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              Cold Mailer is built using industry best practices and a modern
+              Anveshak  is built using industry best practices and a modern
               tech stack, making it perfect for both learning and production
               use.
             </p>
@@ -458,7 +458,7 @@ const HomePage = () => {
               Practical Use Cases
             </h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              Cold Mailer is designed to solve real problems for job seekers,
+              Anveshak  is designed to solve real problems for job seekers,
               students, and professionals. See how it's making a difference.
             </p>
           </div>
@@ -630,7 +630,7 @@ const HomePage = () => {
               What Our Users Say
             </h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              Join thousands of satisfied users who have used Cold Mailer to
+              Join thousands of satisfied users who have used Anveshak  to
               land interviews, connect with researchers, and advance their
               careers.
             </p>
@@ -699,7 +699,7 @@ const HomePage = () => {
               Open Source Collaboration
             </h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              Cold Mailer is built by developers for developers. Join our
+              Anveshak  is built by developers for developers. Join our
               growing community and contribute to a project that's making a real
               difference.
             </p>
@@ -726,7 +726,7 @@ const HomePage = () => {
               <h3 className="text-xl font-semibold mb-2">Contribute Code</h3>
               <p className="text-gray-600">
                 Help improve features, fix bugs, and add new functionality to
-                make Cold Mailer even better.
+                make Anveshak  even better.
               </p>
             </div>
 
@@ -749,7 +749,7 @@ const HomePage = () => {
               </div>
               <h3 className="text-xl font-semibold mb-2">MIT Licensed</h3>
               <p className="text-gray-600">
-                Use Cold Mailer freely in your projects, modify it, and make it
+                Use Anveshak  freely in your projects, modify it, and make it
                 your own. Our permissive license gives you freedom.
               </p>
             </div>

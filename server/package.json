@@ -1,7 +1,7 @@
 {
   "name": "cold-mailer-backend",
   "version": "1.0.0",
-  "description": "Backend for the Cold Mailer application",
+  "description": "Backend for the Anveshak  application",
   "main": "index.js",
   "type": "module",
   "scripts": {

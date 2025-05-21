@@ -98,7 +98,7 @@ export const sendEmail = async ({ to, subject, text, cc, bcc, replyTo }) => {
     }
 
     // Default sender with better formatting
-    const from = `${process.env.COMPANY_NAME || "Cold Mailer"} <${
+    const from = `${process.env.COMPANY_NAME || "Anveshak "} <${
       config.email.user
     }>`;
 
@@ -159,7 +159,7 @@ This link will expire in 24 hours.
 If you did not sign up for an account, please ignore this email.
 
 Best regards,
-The Cold Mailer Team`;
+The Anveshak  Team`;
 
   return sendEmail({ to, subject, text });
 };
@@ -180,18 +180,18 @@ If you did not request this, please ignore this email.
 This link will expire in 1 hour.
 
 Best regards,
-The Cold Mailer Team`;
+The Anveshak  Team`;
 
   return sendEmail({ to, subject, text });
 };
 
 // Send test email with improved format
 export const sendTestEmail = async (to) => {
-  const subject = "Test Email from Cold Mailer";
+  const subject = "Test Email from Anveshak ";
   const text = `This is a test email to verify the email sending functionality is working correctly.
 
 Best regards,
-The Cold Mailer Team`;
+The Anveshak  Team`;
 
   return sendEmail({ to, subject, text });
 };

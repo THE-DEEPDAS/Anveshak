@@ -1034,7 +1034,7 @@ function extractAchievementsData(lines) {
 }
 
 /**
- * Format parsed resume into a structure suitable for the Cold Mailer application
+ * Format parsed resume into a structure suitable for the Anveshak  application
  * @param {Object} parsedResume - Raw parsed resume data
  * @returns {Object} - Formatted resume data for the application
  */

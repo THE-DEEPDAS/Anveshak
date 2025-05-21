@@ -63,7 +63,7 @@ export const AppProvider = ({ children }) => {
             setUser(currentUser);
           } else {
             // Handle unauthenticated state only when mounting
-            const publicPaths = ['/login', '/signup', '/verify', '/'];
+            const publicPaths = ['/login', '/signup', '/verify', '/', '/verify/']; // Make sure /verify/* paths are allowed
             if (!publicPaths.some(path => location.pathname.startsWith(path))) {
               window.location.href = "/";
             }
