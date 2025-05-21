@@ -145,7 +145,13 @@ export const sendEmail = async ({ to, subject, text, cc, bcc, replyTo }) => {
 
 // Send verification email with code
 export const sendVerificationEmail = async (to, verificationCode) => {
-  const subject = "Verify Your Email";
+  if (!to || !verificationCode) {
+    throw new Error("Email and verification code are required");
+  }
+
+  console.log("Sending verification code to:", to);
+  
+  const subject = "Verify Your Email - Anveshak";
   const text = `Thank you for signing up! Your verification code is:
 
 ${verificationCode}

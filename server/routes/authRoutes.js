@@ -49,12 +49,10 @@ router.post("/register", async (req, res) => {
       verificationCodeExpiry,
     });
 
-    await user.save();
-
-    // Get origin from request headers
-    const origin = req.get("origin");    // Send verification email with code
-    try {
+    await user.save();    try {
+      // Send verification email with code
       await sendVerificationEmail(email, verificationCode);
+      console.log("Verification email sent successfully to:", email);
     } catch (emailError) {
       console.error("Error sending verification email:", emailError);
       // Don't fail registration if email fails, but log it
