@@ -80,26 +80,38 @@ router.post("/register", async (req, res) => {
 
 // Verify email - add verifyEmailLimiter
 router.get("/verify/:token", verifyEmailLimiter, async (req, res) => {
-  try {
-    const user = await User.findOne({
+  try {    const user = await User.findOne({
       verificationToken: req.params.token,
       verificationTokenExpiry: { $gt: Date.now() },
     });
 
+    // Get the appropriate frontend URL
+    const getFrontendUrl = () => {
+      if (process.env.FRONTEND_URLS) {
+        return process.env.FRONTEND_URLS.split(',')[0].trim(); // Use the first URL from the list
+      }
+      if (process.env.FRONTEND_URL) {
+        return process.env.FRONTEND_URL;
+      }
+      return "http://localhost:5173";
+    };
+
+    const baseUrl = getFrontendUrl();
+    const loginUrl = `${baseUrl}/login`;
+    const errorUrl = `${baseUrl}/signup`;
+
     if (!user) {
-      return res
-        .status(400)
-        .json({ message: "Invalid or expired verification token" });
+      return res.redirect(`${errorUrl}?error=invalid_token`);
     }
 
     if (user.isVerified) {
-      return res.status(400).json({ message: "Email is already verified" });
-    }    user.isVerified = true;
+      return res.redirect(`${loginUrl}?message=already_verified`);
+    }
+
+    user.isVerified = true;
     user.verificationToken = undefined;
     user.verificationTokenExpiry = undefined;
-    await user.save();
-
-    // Send confirmation email
+    await user.save();    // Send confirmation email
     await sendEmail({
       to: user.email,
       subject: "Email Verification Successful",
@@ -109,29 +121,8 @@ Best regards,
 The Anveshak Team`
     });
 
-    // Send HTML response instead of JSON
-    res.send(`
-      <html>
-        <head>
-          <title>Email Verified</title>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; text-align: center; }
-            .container { max-width: 600px; margin: 40px auto; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background: white; }
-            h1 { color: #2563eb; margin-bottom: 16px; }
-            p { color: #4b5563; margin-bottom: 24px; }
-            .check-icon { color: #10b981; font-size: 48px; margin-bottom: 20px; }
-          </style>
-        </head>
-        <body style="background-color: #f3f4f6;">
-          <div class="container">
-            <div class="check-icon">✓</div>
-            <h1>Email Verified Successfully!</h1>
-            <p>Your email has been verified. You will receive a confirmation email shortly.</p>
-            <p>You can now close this window and log in to your account.</p>
-          </div>
-        </body>
-      </html>
-    `);
+    // Redirect to login page with success message
+    res.redirect(`${loginUrl}?verified=true`);
   } catch (error) {
     console.error("Verification error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
