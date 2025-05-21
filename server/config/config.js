@@ -20,29 +20,39 @@ cloudinary.config({
 
 // Get allowed origins from environment variables
 const getAllowedOrigins = () => {
+  const defaultOrigins = [
+    "http://localhost:5173",
+    "https://anveshak-git-main-the-deepdas-projects.vercel.app",
+    "https://anveshak-the-deepdas-projects.vercel.app",
+    "https://anveshak.vercel.app"
+  ];
+
   if (process.env.FRONTEND_URLS) {
-    return process.env.FRONTEND_URLS.split(',').map(url => url.trim());
+    const envOrigins = process.env.FRONTEND_URLS.split(',').map(url => url.trim());
+    return [...new Set([...defaultOrigins, ...envOrigins])];
   }
   if (process.env.FRONTEND_URL) {
-    return [process.env.FRONTEND_URL];
+    return [...new Set([...defaultOrigins, process.env.FRONTEND_URL])];
   }
-  return ["http://localhost:5173"];
+  return defaultOrigins;
 };
 
 // CORS Configuration
 const corsConfig = {
   origin: function(origin, callback) {
     const allowedOrigins = getAllowedOrigins();
+    console.log('Received request from origin:', origin);
+    console.log('Allowed origins:', allowedOrigins);
     
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) {
       return callback(null, true);
     }
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    if (allowedOrigins.includes(origin)) {
       callback(null, origin);
     } else {
-      console.warn(`Rejected origin: ${origin}`);
+      console.warn(`Rejected origin: ${origin}, not in allowed list:`, allowedOrigins);
       callback(new Error('Not allowed by CORS'));
     }
   },

@@ -31,6 +31,12 @@ const __dirname = dirname(__filename);
 const app = express();
 
 // Apply security middleware
+// Enable CORS with configuration
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
+});
+
 app.use(cors(config.cors));
 app.use(compression());
 app.use(express.json());
