@@ -30,11 +30,21 @@ const __dirname = dirname(__filename);
 // Create Express app
 const app = express();
 
-// Middleware
+// Apply security middleware
+app.use(cors(config.corsConfig));
+app.use(compression());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(cors(config.cors));
+app.use(morgan('dev'));
+
+// CORS configuration - allow credentials and specific origins
+app.use(cors({
+  origin: config.cors.origin,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 
 // Increase timeout for all routes
 app.use((req, res, next) => {
@@ -47,9 +57,6 @@ app.use((req, res, next) => {
 
 // Enable gzip compression
 app.use(compression());
-
-// CORS configuration
-app.use(cors(config.cors));
 
 // Enable pre-flight requests for all routes
 app.options("*", cors(config.cors));

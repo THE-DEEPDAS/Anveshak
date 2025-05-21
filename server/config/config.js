@@ -18,6 +18,26 @@ cloudinary.config({
   secure: true,
 });
 
+// Determine allowed origins based on environment
+const allowedOrigins =
+  process.env.NODE_ENV === "production"
+    ? [process.env.FRONTEND_URL, "https://anveshak.vercel.app"]
+    : ["http://localhost:5173", "http://localhost:3000"];
+
+// CORS Configuration
+const corsConfig = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
 // Validate required configurations
 const validateConfig = () => {
   const requiredEnvVars = [
@@ -71,36 +91,6 @@ const cookieConfig = {
   secure: process.env.NODE_ENV === "production",
   sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
   maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-};
-
-// CORS settings
-const corsConfig = {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, etc.)
-    if (!origin) {
-      return callback(null, true);
-    }
-
-    // Parse the allowed origins from the environment variable
-    const allowedOrigins = (
-      process.env.FRONTEND_URLS ||
-      process.env.FRONTEND_URL ||
-      "http://localhost:5173"
-    )
-      .split(",")
-      .map((url) => url.trim());
-
-    // Check if the origin is in our allowed list
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error(`Origin ${origin} not allowed by CORS policy`));
-    }
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  exposedHeaders: ["set-cookie"],
 };
 
 // Helper to parse MongoDB URI and add options
@@ -185,4 +175,8 @@ export const config = {
   cors: corsConfig,
 };
 
+// Export individual configs for direct access
+export { corsConfig };
+
+// Default export for backward compatibility
 export default config;

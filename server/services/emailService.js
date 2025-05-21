@@ -145,11 +145,11 @@ export const sendEmail = async ({ to, subject, text, cc, bcc, replyTo }) => {
 
 // Send verification email with improved format
 export const sendVerificationEmail = async (to, verificationToken, origin) => {
-  // Check if the origin is in allowed URLs, otherwise use default  // Use API URL for direct verification
-  const apiUrl = process.env.API_URL || "http://localhost:5000/api";
-  const verificationUrl = `${apiUrl}/auth/verify/${verificationToken}`;
+  // Check if the origin is in allowed URLs, otherwise use default  // Use the frontend URL for verification
+  const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const verificationUrl = `${baseUrl}/verify/${verificationToken}`;
   const subject = "Email Verification";
-  const text = `Thank you for signing up! Please click the link below to verify your email address. After verification, you'll receive a confirmation email:
+  const text = `Thank you for signing up! Please click the link below to verify your email address:
 
 ${verificationUrl}
 
