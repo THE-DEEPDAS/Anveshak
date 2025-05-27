@@ -189,8 +189,7 @@ const Navbar = () => {
               </Link>
             </>
           ) : (
-            <>
-              <Link
+            <>              <Link
                 to="/"
                 className={`text-sm font-medium ${
                   location.pathname === "/"

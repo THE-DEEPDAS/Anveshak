@@ -15,6 +15,12 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import VerifyEmailPage from "./pages/VerifyEmailPage";
 import AcademicEmailsPage from "./pages/AcademicEmailsPage";
+import AboutUsPage from "./pages/AboutUsPage";
+import ContactUsPage from "./pages/ContactUsPage";
+import PricingPage from "./pages/PricingPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TermsPage from "./pages/TermsPage";
+import RefundPolicyPage from "./pages/RefundPolicyPage";
 
 // Enable React Router v7 future flags
 const router = {
@@ -31,12 +37,17 @@ function App() {
         <AppProvider>
           <div className="flex flex-col min-h-screen bg-gray-50">
             <Navbar />
-            <main className="flex-grow">
-              <Routes>
+            <main className="flex-grow">              <Routes>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignupPage />} />
                 <Route path="/verify-email" element={<VerifyEmailPage />} />
+                <Route path="/about-us" element={<AboutUsPage />} />
+                <Route path="/contact-us" element={<ContactUsPage />} />
+                <Route path="/pricing" element={<PricingPage />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/refund-policy" element={<RefundPolicyPage />} />
                 <Route
                   path="/onboarding"
                   element={

@@ -1,5 +1,6 @@
 import React from 'react';
 import { FaEnvelope, FaGithub, FaLinkedin } from 'react-icons/fa';
+import { Link } from 'react-router-dom';
 
 const Footer = () => {
   return (
@@ -20,9 +21,19 @@ const Footer = () => {
             <div className="mb-4 md:mb-0">
               <h3 className="font-semibold mb-2 text-white">Links</h3>
               <ul className="space-y-1 text-sm">
-                <li><a href="/" className="text-gray-400 hover:text-white transition-colors">Home</a></li>
-                <li><a href="/onboarding" className="text-gray-400 hover:text-white transition-colors">Upload Resume</a></li>
-                <li><a href="/dashboard" className="text-gray-400 hover:text-white transition-colors">Dashboard</a></li>
+                <li><Link to="/" className="text-gray-400 hover:text-white transition-colors">Home</Link></li>
+                <li><Link to="/about-us" className="text-gray-400 hover:text-white transition-colors">About Us</Link></li>
+                <li><Link to="/pricing" className="text-gray-400 hover:text-white transition-colors">Pricing</Link></li>
+                <li><Link to="/contact-us" className="text-gray-400 hover:text-white transition-colors">Contact Us</Link></li>
+              </ul>
+            </div>
+            
+            <div className="mb-4 md:mb-0">
+              <h3 className="font-semibold mb-2 text-white">Legal</h3>
+              <ul className="space-y-1 text-sm">
+                <li><Link to="/privacy-policy" className="text-gray-400 hover:text-white transition-colors">Privacy Policy</Link></li>
+                <li><Link to="/terms" className="text-gray-400 hover:text-white transition-colors">Terms of Service</Link></li>
+                <li><Link to="/refund-policy" className="text-gray-400 hover:text-white transition-colors">Refund Policy</Link></li>
               </ul>
             </div>
             
