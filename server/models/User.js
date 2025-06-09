@@ -24,17 +24,18 @@ const userSchema = new mongoose.Schema(
         return this.isVerified === true;
       },
       minlength: [6, "Password must be at least 6 characters"],
-    },    isVerified: {
+    },
+    isVerified: {
       type: Boolean,
       default: false,
     },
     verificationCode: {
       type: String,
-      default: null
+      default: null,
     },
     verificationCodeExpiry: {
       type: Date,
-      default: null
+      default: null,
     },
     verificationToken: String,
     verificationTokenExpiry: Date,
@@ -44,6 +45,29 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    // Payment related fields
+    hasValidPayment: {
+      type: Boolean,
+      default: false,
+    },
+    paymentExpiryDate: {
+      type: Date,
+      default: null,
+    },
+    lastPaymentId: {
+      type: String,
+      default: null,
+    },
+    paymentHistory: [
+      {
+        paymentId: String,
+        amount: Number,
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   {
     timestamps: true,

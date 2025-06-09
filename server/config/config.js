@@ -26,56 +26,46 @@ const getAllowedOrigins = () => {
     "https://anveshak-git-main-the-deepdas-projects.vercel.app",
     "https://anveshak-the-deepdas-projects.vercel.app",
     "https://anveshak.vercel.app",
-    "https://anveshak-8dq6lnxy9-the-deepdas-projects.vercel.app"
+    "https://anveshak-8dq6lnxy9-the-deepdas-projects.vercel.app",
   ];
 
   let origins = [];
-  
+
   // Add origins from environment variables
   if (process.env.FRONTEND_URLS) {
-    const envOrigins = process.env.FRONTEND_URLS.split(',').map(url => url.trim());
+    const envOrigins = process.env.FRONTEND_URLS.split(",").map((url) =>
+      url.trim()
+    );
     origins.push(...envOrigins);
   }
-  
+
   if (process.env.FRONTEND_URL) {
     origins.push(process.env.FRONTEND_URL);
   }
-  
+
   // Combine with defaults and remove duplicates
   origins = [...new Set([...defaultOrigins, ...origins])];
-  
-  console.log('Configured CORS origins:', origins);
+
+  console.log("Configured CORS origins:", origins);
   return origins;
 };
 
 // CORS Configuration
 const corsConfig = {
-  origin: function(origin, callback) {
-    const allowedOrigins = getAllowedOrigins();
-    
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {
-      return callback(null, true);
-    }
-    
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.warn(`Rejected origin: ${origin}, not in allowed list:`, allowedOrigins);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
+  origin: getAllowedOrigins(),
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-  exposedHeaders: ["Set-Cookie"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Cache-Control",
+    "Pragma",
+    "Expires",
+  ],
+  exposedHeaders: ["Set-Cookie", "Cache-Control", "Pragma", "Expires"],
   preflightContinue: false,
-  optionsSuccessStatus: 204
+  optionsSuccessStatus: 204,
 };
 
 // Validate required configurations
@@ -159,10 +149,10 @@ const getMongoDBUri = () => {
 
 // Get backend URL based on environment
 const getBackendUrl = () => {
-  if (process.env.NODE_ENV === 'production') {
-    return process.env.BACKEND_URL || 'https://anveshak-4md5.onrender.com';
+  if (process.env.NODE_ENV === "production") {
+    return process.env.BACKEND_URL || "https://anveshak-4md5.onrender.com";
   }
-  return 'http://localhost:5000';
+  return "http://localhost:5000";
 };
 
 // Export configuration

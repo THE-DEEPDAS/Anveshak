@@ -78,6 +78,12 @@ export const logout = async () => {
 
 export const getCurrentUser = async () => {
   try {
+    // Ensure Authorization header is set if token exists
+    const token = localStorage.getItem("token");
+    if (token && !axios.defaults.headers.common["Authorization"]) {
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    }
+
     // Get user data from /me endpoint
     const response = await axios.get(`${API_ENDPOINTS.auth}/me`);
     if (response.data) {
@@ -86,7 +92,7 @@ export const getCurrentUser = async () => {
     }
     return null;
   } catch (error) {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 || error.response?.status === 403) {
       // Clear invalid session
       localStorage.removeItem("user");
       localStorage.removeItem("token");
@@ -157,8 +163,7 @@ export const resendVerificationCode = async (email) => {
     return response.data;
   } catch (error) {
     const message =
-      error.response?.data?.message ||
-      "Failed to resend verification code";
+      error.response?.data?.message || "Failed to resend verification code";
     throw { response: { data: { message } } };
   }
 };

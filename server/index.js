@@ -9,9 +9,9 @@ import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import compression from "compression";
 import { config } from "./config/config.js";
+import { EventEmitter } from "events";
 import Faculty from "./models/Faculty.js";
 import Institution from "./models/Institution.js";
-import { EventEmitter } from "events";
 
 // Increase max listeners
 EventEmitter.defaultMaxListeners = 15;
@@ -23,6 +23,7 @@ import userRoutes from "./routes/userRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import academicRoutes from "./routes/academicRoutes.js";
 import statsRoutes from "./routes/statsRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -30,26 +31,40 @@ const __dirname = dirname(__filename);
 // Create Express app
 const app = express();
 
-// Apply security middleware
+// Initial CORS configuration
 app.use(cors(config.cors));
 
-// Additional CORS headers for preflight requests
+// Additional headers middleware
 app.use((req, res, next) => {
-  const origin = req.get('origin');
+  const origin = req.get("origin");
   const allowedOrigins = config.cors.origin;
-  
-  if (origin && (typeof allowedOrigins === 'function' ? true : allowedOrigins.includes(origin))) {
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+
+  if (origin && allowedOrigins.includes(origin)) {
+    // Set CORS headers
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.header("Access-Control-Allow-Origin", origin);
+    res.header(
+      "Access-Control-Allow-Methods",
+      "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS"
+    );
+    res.header(
+      "Access-Control-Allow-Headers",
+      "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma"
+    );
+    res.header("Access-Control-Expose-Headers", "Set-Cookie");
+
+    // Additional headers for payment routes
+    if (req.path.startsWith("/api/payment/")) {
+      res.header("Access-Control-Max-Age", "7200"); // 2 hours
+      res.header("Vary", "Origin");
+    }
   }
-  
-  // Handle preflight
-  if (req.method === 'OPTIONS') {
+
+  // Handle preflight requests
+  if (req.method === "OPTIONS") {
     return res.status(204).end();
   }
-  
+
   next();
 });
 
@@ -57,7 +72,16 @@ app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(morgan('dev'));
+app.use(morgan("dev"));
+
+// Mount routes
+app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/resumes", resumeRoutes);
+app.use("/api/emails", emailRoutes);
+app.use("/api/academic", academicRoutes);
+app.use("/api/stats", statsRoutes);
+app.use("/api/payment", paymentRoutes);
 
 // Increase timeout for all routes
 app.use((req, res, next) => {
@@ -144,6 +168,7 @@ app.use("/api/emails", emailRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/academic", academicRoutes);
 app.use("/api/stats", statsRoutes);
+app.use("/api/payment", paymentRoutes);
 
 // Database connection
 mongoose

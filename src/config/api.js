@@ -12,9 +12,26 @@ axios.defaults.headers.common["Content-Type"] = "application/json";
 axios.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
+
+    // Always include credentials for cross-origin requests
+    config.withCredentials = true;
+
+    // Set authorization header if token exists
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Special handling for payment routes
+    if (config.url?.startsWith("/payment/")) {
+      config.headers = {
+        ...config.headers,
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : undefined,
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      };
+    }
+
     return config;
   },
   (error) => {
@@ -30,20 +47,29 @@ axios.interceptors.response.use(
     const isLoginPage = window.location.pathname === "/login";
     const isLandingPage = window.location.pathname === "/";
     const isSignupPage = window.location.pathname === "/signup";
+    const isPaymentPage = window.location.pathname === "/payment-required";
     const isRefreshRequest = originalRequest.url === "/auth/refresh-token";
+    const isPaymentCheck = originalRequest.url?.includes(
+      "/payment/check-status"
+    );
+
+    // Handle 401 errors from payment check differently
+    if (error.response?.status === 401 && isPaymentCheck) {
+      // Don't retry payment checks - they should fail if unauthorized
+      return Promise.reject(error);
+    }
 
     // Don't retry if:
     // 1. It's already a refresh token request
-    // 2. We're on the login page
+    // 2. We're on the login/signup/landing/payment page
     // 3. The request has already been retried
-    // 4. We're on the Signup page
-    // 5. We're on the Landing page
     if (
       error.response?.status === 401 &&
       !isRefreshRequest &&
       !isLandingPage &&
       !isLoginPage &&
       !isSignupPage &&
+      !isPaymentPage &&
       !originalRequest._retry
     ) {
       originalRequest._retry = true;
@@ -57,10 +83,13 @@ axios.interceptors.response.use(
         localStorage.setItem("token", token);
         axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
+        // Update the original request's auth header
+        originalRequest.headers["Authorization"] = `Bearer ${token}`;
+
         // Retry the original request
         return axios(originalRequest);
       } catch (refreshError) {
-        // If refresh token fails, clean up and redirect to login
+        // If refresh token fails, clean up and redirect appropriately
         localStorage.removeItem("user");
         localStorage.removeItem("token");
         delete axios.defaults.headers.common["Authorization"];
@@ -84,6 +113,7 @@ export const API_ENDPOINTS = {
   emails: "/emails",
   academic: "/academic",
   stats: "/stats",
+  payment: "/payment",
 };
 
 export default axios;
