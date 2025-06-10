@@ -57,6 +57,8 @@ const router = express.Router();
 // Upload resume with enhanced error handling and validation
 router.post("/upload", authenticateToken, (req, res) => {
   upload(req, res, async (err) => {
+    // Track if this is a resume update
+    const isUpdate = req.body.updateExisting === "true";
     if (err instanceof multer.MulterError) {
       if (err.code === "LIMIT_FILE_SIZE") {
         return res
@@ -100,11 +102,31 @@ router.post("/upload", authenticateToken, (req, res) => {
         previousResume = await Resume.findOne({
           user: req.user.userId,
         }).sort({ createdAt: -1 });
+
+        // If this is an update and we found a previous resume, we'll delete it after successful upload
+        if (isUpdate && previousResume) {
+          console.log(
+            `Preparing to replace previous resume: ${previousResume._id}`
+          );
+        }
       } catch (prevError) {
         console.log("No previous resume found, continuing without fallback");
       }
 
       console.log(`Uploading resume to Cloudinary: ${req.file.filename}`);
+
+      // If updating, delete the old file from Cloudinary
+      if (isUpdate && previousResume?.cloudinaryPublicId) {
+        try {
+          await cloudinary.uploader.destroy(previousResume.cloudinaryPublicId);
+          console.log(
+            `Deleted old resume file: ${previousResume.cloudinaryPublicId}`
+          );
+        } catch (deleteError) {
+          console.error("Error deleting old resume file:", deleteError);
+          // Continue with upload even if delete fails
+        }
+      }
 
       // Upload to Cloudinary with enhanced configuration for reliability
       const result = await cloudinary.uploader.upload(req.file.path, {
@@ -199,12 +221,21 @@ router.post("/upload", authenticateToken, (req, res) => {
         }
       }
 
-      // Use the actual secure_url from Cloudinary for consistency
+      // If this was an update, delete the old resume document
+      if (isUpdate && previousResume) {
+        try {
+          await Resume.findByIdAndDelete(previousResume._id);
+          console.log(`Deleted old resume document: ${previousResume._id}`);
+        } catch (deleteError) {
+          console.error("Error deleting old resume document:", deleteError);
+          // Continue since the new resume is already saved
+        }
+      }
+
       res.json({
-        message:
-          resume.parseStatus === "completed"
-            ? "Resume uploaded and parsed successfully"
-            : "Resume uploaded but parsing failed",
+        message: isUpdate
+          ? "Resume updated and parsed successfully"
+          : "Resume uploaded and parsed successfully",
         resumeId: resume._id,
         resume: {
           ...resume.toObject(),

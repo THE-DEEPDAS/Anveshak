@@ -72,6 +72,7 @@ const resumeSchema = new mongoose.Schema(
       enum: [
         "regular",
         "ai",
+        "ai_retry",
         "combined",
         "advanced",
         "simplified",

@@ -170,14 +170,18 @@ const ResumeUploader = () => {
     setShowParseModeOptions(false);
     showToast(`Parse mode set to: ${mode}`, "info");
   };
-
   const handleFileUpload = async (file) => {
     if (!file) {
       setError("Please select a file to upload");
       return;
     }
     const formData = new FormData();
-    formData.append("resume", file); // Changed from "file" to "resume" to match server's expectation
+    formData.append("resume", file);
+
+    // If we already have a resume, this is an update
+    if (resume?.id) {
+      formData.append("updateExisting", "true");
+    }
 
     setIsUploading(true);
     setError(null);
@@ -213,7 +217,12 @@ const ResumeUploader = () => {
         );
         navigate("/dashboard");
       } else {
-        showToast("Resume uploaded and parsed successfully!", "success");
+        showToast(
+          resume?.id
+            ? "Resume updated and parsed successfully!"
+            : "Resume uploaded and parsed successfully!",
+          "success"
+        );
         navigate("/dashboard");
       }
     } catch (error) {
@@ -232,29 +241,41 @@ const ResumeUploader = () => {
   if (resume?.url) {
     return (
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">
-          Current Resume
-        </h2>
-        <div className="flex flex-col space-y-4">
-          <div className="flex items-center justify-between">
-            <a
-              href={resume.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-700 underline"
-              onClick={(e) => {
-                if (!resume.url) {
-                  e.preventDefault();
-                  showToast("Resume URL is not available", "error");
-                }
-              }}
-            >
-              View Current Resume
-            </a>
+        {/* Top management panel */}
+        <div className="flex flex-col w-full mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+          {/* First row: Title, actions, and status */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4">
+              <h2 className="text-xl font-semibold text-gray-800">
+                Current Resume
+              </h2>
+              <a
+                href={resume.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-700 underline"
+                onClick={(e) => {
+                  if (!resume.url) {
+                    e.preventDefault();
+                    showToast("Resume URL is not available", "error");
+                  }
+                }}
+              >
+                View Current Resume
+              </a>
+              <FileUpload
+                onFileSelect={handleFileUpload}
+                accept=".pdf"
+                maxSize={5}
+                buttonText="Upload New Version"
+                buttonClassName="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                disabled={isUploading || isParsing || isRetrying}
+              />
+            </div>
 
-            {/* Parser method indicator */}
-            {resume.parseMethod && (
-              <div className="flex items-center">
+            {/* Parse status and method */}
+            <div className="flex items-center gap-3">
+              {resume.parseMethod && (
                 <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-md flex items-center">
                   {resume.parseMethod === "ai" ||
                   resume.parseMethod === "ai-fallback" ? (
@@ -273,7 +294,6 @@ const ResumeUploader = () => {
                       {resume.parseMethod}
                     </>
                   )}
-
                   {resume.foundExactSections && (
                     <span
                       className="ml-1 inline-block w-2 h-2 bg-green-500 rounded-full"
@@ -281,11 +301,85 @@ const ResumeUploader = () => {
                     ></span>
                   )}
                 </span>
+              )}
+              {/* Reparse button */}{" "}
+              <Button
+                type="button"
+                onClick={() => handleRetry(parseMode === "ai")}
+                disabled={isRetrying}
+                variant="primary"
+                size="sm"
+                className="font-bold"
+              >
+                <FaSync
+                  className={`mr-1 h-3 w-3 ${isRetrying ? "animate-spin" : ""}`}
+                />
+                {isRetrying ? "Processing..." : "Reparse Resume"}
+              </Button>
+            </div>
+          </div>
+
+          {/* Second row: Parse mode options */}
+          <div className="w-full">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Parse Mode
+              </label>
+              <button
+                type="button"
+                onClick={toggleParseModeOptions}
+                className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+              >
+                <FaCog className="mr-1" />
+                {showParseModeOptions ? "Hide Options" : "Show Options"}
+              </button>
+            </div>
+
+            {showParseModeOptions ? (
+              <div className="grid grid-cols-3 gap-4">
+                {parseModeOptions.map((option) => (
+                  <div
+                    key={option.value}
+                    className={`flex items-start p-3 rounded-md cursor-pointer border ${
+                      parseMode === option.value
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 hover:bg-gray-100"
+                    }`}
+                    onClick={() => handleParseModeChange(option.value)}
+                  >
+                    <input
+                      type="radio"
+                      name="parseMode"
+                      checked={parseMode === option.value}
+                      onChange={() => handleParseModeChange(option.value)}
+                      className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500 mt-1 mr-2"
+                    />
+                    <div>
+                      <label className="font-medium text-gray-800 text-sm block mb-1">
+                        {option.label}
+                      </label>
+                      <p className="text-gray-500 text-xs">
+                        {option.description}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center">
+                <span className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                  Selected:{" "}
+                  {
+                    parseModeOptions.find(
+                      (option) => option.value === parseMode
+                    )?.label
+                  }
+                </span>
               </div>
             )}
           </div>
 
-          {/* Parse status information */}
+          {/* Third row: Warning and error states */}
           {(resume.parseStatus === "failed" ||
             resume.warning ||
             parseWarning) && (
@@ -399,10 +493,13 @@ const ResumeUploader = () => {
               </div>
             </div>
           )}
+        </div>
 
+        {/* Content section below */}
+        <div className="w-full">
           <div className="border-t pt-4">
             <h3 className="text-lg font-medium text-gray-800 mb-2">
-              Upload New Resume
+              {resume?.id ? "Update Current Resume" : "Upload New Resume"}
             </h3>
 
             {/* Parse Mode Selection (when resume exists) */}

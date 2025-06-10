@@ -193,7 +193,7 @@ const HomePage = () => {
               Seamless Process
             </span>
             <h2 className="text-4xl font-bold mt-2 mb-4 text-gray-800">
-              How Anveshak  Works
+              How Anveshak Works
             </h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
               Our intelligent workflow combines resume parsing, AI matching, and
@@ -211,11 +211,12 @@ const HomePage = () => {
                 <FaFileUpload className="h-10 w-10 text-blue-600" />
               </div>
               <h3 className="text-xl font-semibold mb-3 text-gray-800">
-                Smart Resume Parsing
+                Advanced Resume Parsing
               </h3>
               <p className="text-gray-600">
-                Our advanced algorithms extract skills, experience, and projects
-                with industry-leading accuracy using multiple parsing methods.
+                Our advanced AI algorithms and multiple parsing methods deliver
+                industry-leading accuracy in extracting skills, experience, and
+                projects from your resume.
               </p>
             </div>
 
@@ -294,9 +295,8 @@ const HomePage = () => {
               Production-Grade Architecture
             </h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              Anveshak  is built using industry best practices and a modern
-              tech stack, making it perfect for both learning and production
-              use.
+              Anveshak is built using industry best practices and a modern tech
+              stack, making it perfect for both learning and production use.
             </p>
           </div>
 
@@ -458,7 +458,7 @@ const HomePage = () => {
               Practical Use Cases
             </h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              Anveshak  is designed to solve real problems for job seekers,
+              Anveshak is designed to solve real problems for job seekers,
               students, and professionals. See how it's making a difference.
             </p>
           </div>
@@ -630,9 +630,8 @@ const HomePage = () => {
               What Our Users Say
             </h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              Join thousands of satisfied users who have used Anveshak  to
-              land interviews, connect with researchers, and advance their
-              careers.
+              Join thousands of satisfied users who have used Anveshak to land
+              interviews, connect with researchers, and advance their careers.
             </p>
           </div>
 
@@ -699,8 +698,8 @@ const HomePage = () => {
               Open Source Collaboration
             </h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              Anveshak  is built by developers for developers. Join our
-              growing community and contribute to a project that's making a real
+              Anveshak is built by developers for developers. Join our growing
+              community and contribute to a project that's making a real
               difference.
             </p>
           </div>
@@ -726,7 +725,7 @@ const HomePage = () => {
               <h3 className="text-xl font-semibold mb-2">Contribute Code</h3>
               <p className="text-gray-600">
                 Help improve features, fix bugs, and add new functionality to
-                make Anveshak  even better.
+                make Anveshak even better.
               </p>
             </div>
 
@@ -749,7 +748,7 @@ const HomePage = () => {
               </div>
               <h3 className="text-xl font-semibold mb-2">MIT Licensed</h3>
               <p className="text-gray-600">
-                Use Anveshak  freely in your projects, modify it, and make it
+                Use Anveshak freely in your projects, modify it, and make it
                 your own. Our permissive license gives you freedom.
               </p>
             </div>

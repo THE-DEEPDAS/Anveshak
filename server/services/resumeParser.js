@@ -1166,55 +1166,39 @@ export const parseResume = async (path, options = {}) => {
 
         if (rawText.length > 50) {
           try {
-            const aiResult = await parseResumeWithAI(rawText);
+            // Import the llmService instance
+            const llmService = await import("./llmService.js");
+            const { extractSkills, extractExperience, extractProjects } =
+              await import("./llmParser.js");
+
+            // Parse different sections in parallel for efficiency
+            const [skills, experience, projects] = await Promise.all([
+              extractSkills(rawText, llmService),
+              extractExperience(rawText, llmService),
+              extractProjects(rawText, llmService),
+            ]);
 
             console.log("AI parsing complete");
             console.log(
-              `AI found: ${aiResult.skills?.length || 0} skills, ${
-                aiResult.experience?.length || 0
-              } experiences, ${aiResult.projects?.length || 0} projects`
+              `Found: ${skills.length} skills, ${experience.length} experiences, ${projects.length} projects`
             );
 
             return {
               text: rawText,
-              skills: aiResult.skills || [],
-              experience: aiResult.experience || [],
-              projects: aiResult.projects || [],
+              skills,
+              experience,
+              projects,
               parsedAt: new Date(),
               parseMethod: "ai",
-              foundExactSections: false,
+              foundExactSections: true,
             };
           } catch (aiError) {
             console.error("Error in AI parsing:", aiError);
-            console.log(
-              "AI parser failed, returning simplified results as fallback"
-            );
-
-            // Return simplified results as fallback
-            return {
-              text: parsedData.rawText || "",
-              skills: formattedData.skills || [],
-              experience: formattedData.experience || [],
-              projects: formattedData.projects || [],
-              parsedAt: new Date(),
-              parseMethod: "simplified-fallback",
-              foundExactSections: foundExactSections,
-            };
+            throw new Error("AI parsing failed");
           }
         } else {
-          console.log(
-            "Text too short for AI parsing, returning simplified results"
-          );
-          // Return simplified results if text is too short
-          return {
-            text: parsedData.rawText || "",
-            skills: formattedData.skills || [],
-            experience: formattedData.experience || [],
-            projects: formattedData.projects || [],
-            parsedAt: new Date(),
-            parseMethod: "simplified-fallback",
-            foundExactSections: foundExactSections,
-          };
+          console.warn("Text too short for AI parsing");
+          throw new Error("Text too short for parsing");
         }
       } else if (parseMode === "retry") {
         // Retry with advanced parser (for future implementation)
