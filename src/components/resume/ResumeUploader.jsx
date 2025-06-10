@@ -15,13 +15,12 @@ import {
   FaExclamationTriangle,
   FaTrash,
   FaCodeBranch,
-  FaBrain,
   FaCog,
 } from "react-icons/fa";
 import { useToast } from "../../components/ui/Toaster";
 
 const ResumeUploader = () => {
-  const { user, resume, setResume, updateResume } = useAppContext();
+  const { resume, setResume, updateResume } = useAppContext();
   const [isUploading, setIsUploading] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -61,6 +60,7 @@ const ResumeUploader = () => {
   useEffect(() => {
     if (resume?.id && resume.parseStatus === "pending") {
       setIsParsing(true);
+      // repeated execution after every 5 seconds to check the resume parsing status
       const pollInterval = setInterval(async () => {
         try {
           const data = await getResumeById(resume.id);
@@ -70,6 +70,8 @@ const ResumeUploader = () => {
             setResume({
               ...resume,
               ...data,
+              // if we wanted to append
+              // skills: [...(resume.skills || []), ...(data.skills || [])],
               skills: data.skills || [],
               experience: data.experience || [],
               projects: data.projects || [],
@@ -175,11 +177,15 @@ const ResumeUploader = () => {
       setError("Please select a file to upload");
       return;
     }
+    // formdata ek js object che je key-value pairs store kare che
+    // automatically set the content type to multipart/form-data
+    // so easier to send giles using fetch or axios
     const formData = new FormData();
     formData.append("resume", file);
 
     // If we already have a resume, this is an update
     if (resume?.id) {
+      // added a new field to indicate this is an update
       formData.append("updateExisting", "true");
     }
 

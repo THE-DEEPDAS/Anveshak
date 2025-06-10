@@ -3,12 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
 import { useToast } from "../../components/ui/Toaster";
 import {
-  FaFileDownload,
-  FaCode,
-  FaBriefcase,
   FaSpinner,
-  FaLightbulb,
-  FaEdit,
   FaTrash,
 } from "react-icons/fa";
 
@@ -39,6 +34,7 @@ const ResumeAnalysis = () => {
     setIsSaving(true);
 
     try {
+      // trim thi aagad ane pachad ni whitespaces ne remove kare che
       const validData = data.filter((item) => item.trim());
       if (validData.length === 0) {
         throw new Error(`Please add at least one ${field} item`);
