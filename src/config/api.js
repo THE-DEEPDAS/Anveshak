@@ -107,6 +107,8 @@ axios.interceptors.response.use(
 );
 
 export const API_ENDPOINTS = {
+  // easier to manage API endpoints
+  // we can use these constants in our components
   auth: "/auth",
   users: "/users",
   resumes: "/resumes",

@@ -17,6 +17,8 @@ const Navbar = () => {
   const hasCheckedResume = useRef(false);
 
   useEffect(() => {
+    // event.target is the element that triggered the event
+    // Close profile menu when clicking outside of menu button
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setShowProfileMenu(false);
@@ -55,35 +57,6 @@ const Navbar = () => {
 
   const toggleProfileMenu = () => {
     setShowProfileMenu(!showProfileMenu);
-  };
-
-  const renderAuthLinks = () => {
-    // Don't show login/signup if user is logged in
-    if (user) {
-      return null;
-    }
-
-    // Only show auth links if not on login or signup pages
-    if (location.pathname === "/login" || location.pathname === "/signup") {
-      return null;
-    }
-
-    return (
-      <>
-        <Link
-          to="/signup"
-          className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
-        >
-          Sign Up
-        </Link>
-        <Link
-          to="/login"
-          className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
-        >
-          Login
-        </Link>
-      </>
-    );
   };
 
   const renderProfileMenu = () => {

@@ -37,6 +37,7 @@ export const AppProvider = ({ children }) => {
   const publicRoutes = ["/login", "/signup", "/verify-email", "/"];
   // Fetch resume data when user logs in
   useEffect(() => {
+    // this will show that a component is active and prevent memory leaks
     let isMounted = true;
 
     const initializeAuth = async () => {

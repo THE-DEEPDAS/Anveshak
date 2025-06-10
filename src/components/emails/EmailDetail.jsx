@@ -73,6 +73,7 @@ const EmailDetail = () => {
   };
 
   const formatDate = (dateStr) => {
+    // formats this type of date: "2023-10-01T12:34:56.789Z"
     if (!dateStr) return "Not sent yet";
     return format(new Date(dateStr), "MMMM dd, yyyy 'at' h:mm a");
   };
@@ -120,66 +121,6 @@ const EmailDetail = () => {
     }
   };
 
-  const renderEmailContent = () => {
-    if (isEditing) {
-      return (
-        <div className="space-y-4">
-          <div>
-            <label
-              htmlFor="subject"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Subject
-            </label>
-            <input
-              type="text"
-              id="subject"
-              value={editedSubject}
-              onChange={(e) => setEditedSubject(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="body"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Body
-            </label>
-            <textarea
-              id="body"
-              rows={15}
-              value={editedBody}
-              onChange={(e) => setEditedBody(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
-          </div>
-          <div className="flex justify-end space-x-3">
-            <Button
-              onClick={cancelEditing}
-              variant="secondary"
-              disabled={saving}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleSave} loading={saving}>
-              Save Changes
-            </Button>
-          </div>
-        </div>
-      );
-    }
-
-    // Regular view mode
-    return (
-      <div>
-        <h2 className="text-xl font-semibold mb-4">{email.subject}</h2>
-        <div className="whitespace-pre-wrap bg-white rounded-lg p-4 border">
-          {email.body}
-        </div>
-      </div>
-    );
-  };
 
   if (loading) {
     return (
@@ -326,6 +267,7 @@ const EmailDetail = () => {
                 <textarea
                   id="body"
                   rows={15}
+                  // flag jevu che je kai changes thase to batavse
                   value={editedBody}
                   onChange={(e) => setEditedBody(e.target.value)}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 font-mono"

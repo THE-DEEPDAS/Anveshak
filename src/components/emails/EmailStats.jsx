@@ -9,6 +9,8 @@ import {
 
 const EmailStats = () => {
   const { user } = useAppContext();
+  // created an object to hold email statistics
+  // and used useState to manage its state
   const [stats, setStats] = useState({
     total: 0,
     sent: 0,
@@ -27,6 +29,7 @@ const EmailStats = () => {
 
         const newStats = {
           total: emails.length,
+          // filter thi je emails conidition satisfy kare te return thaay(element return kare)
           sent: emails.filter((email) => email.status === "sent").length,
           draft: emails.filter((email) => email.status === "draft").length,
           failed: emails.filter((email) => email.status === "failed").length,

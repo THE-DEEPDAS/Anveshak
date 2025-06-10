@@ -1,11 +1,9 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
 import Button from "../ui/Button";
 import {
   FaGraduationCap,
-  FaSpinner,
-  FaCheck,
   FaEnvelope,
 } from "react-icons/fa";
 import {
@@ -98,6 +96,7 @@ const AcademicEmailGenerator = () => {
   const handleSendEmails = async (email) => {
     try {
       const response = await axios.post(
+        // aa endpoint che jena par me moklu te data process thaine mail send thase
         `${API_ENDPOINTS.academic}/generate-preview-emails`,
         {
           resumeId: resume.id,
@@ -175,13 +174,6 @@ const AcademicEmailGenerator = () => {
     }
   };
   // Simplified selection - only one faculty at a time
-  const toggleFacultySelection = (facultyMember) => {
-    if (!facultyMember.email) {
-      showToast("Faculty member must have an email address", "error");
-      return;
-    }
-    setSelectedFaculty([facultyMember]); // Replace entire selection with single faculty member
-  };
   const handleFacultySelect = (facultyId) => {
     const selectedFacultyMember = faculty.find((f) => f._id === facultyId);
     if (!selectedFacultyMember) return;
@@ -240,13 +232,6 @@ const AcademicEmailGenerator = () => {
     ));
   };
 
-  const handleGenerateEmails = () => {
-    if (selectedFaculty.length === 0) {
-      showToast("Please select at least one faculty member", "error");
-      return;
-    }
-    navigate("/emails");
-  };
 
   return (
     <div className="container mx-auto px-4 py-8">

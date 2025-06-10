@@ -34,6 +34,8 @@ const CompanySelector = ({ companies, onCompaniesSelected }) => {
 
       for (const category of categories) {
         if (
+          // checks if the category exists in the techStack object
+          // and if it's an array with at least one item
           Array.isArray(techStack[category]) &&
           techStack[category].length > 0
         ) {

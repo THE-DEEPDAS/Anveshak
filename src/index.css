@@ -1,3 +1,6 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/*
+tailwind ni base styles like global styles pachi components like buttons, cards, etc. and utilities like flex, grid, etc badhu import karva maate che.
+*/

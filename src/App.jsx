@@ -1,4 +1,3 @@
-import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster, ToastProvider } from "./components/ui/Toaster";
 import Navbar from "./components/layout/Navbar";
@@ -9,7 +8,6 @@ import DashboardPage from "./pages/DashboardPage";
 import EmailsPage from "./pages/EmailsPage";
 import EmailDetailPage from "./pages/EmailDetailPage";
 import ProtectedRoute from "./components/layout/ProtectedRoute";
-import LandingPage from "./pages/LandingPage";
 import { AppProvider } from "./context/AppContext";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
@@ -35,7 +33,7 @@ function App() {
   return (
     <ToastProvider>
       <Router {...router}>
-        <AppProvider>
+        <AppProvider> 
           <div className="flex flex-col min-h-screen bg-gray-50">
             <Navbar />
             <main className="flex-grow">

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
 import { checkPaymentStatus } from "../../services/paymentService";
@@ -40,8 +40,6 @@ const ProtectedRoute = ({ children }) => {
             "/signup",
           ];
 
-          const isPaymentRequiredPath =
-            location.pathname === "/payment-required";
           const skipPaymentCheck = noPaymentCheckPaths.some((path) =>
             location.pathname.startsWith(path)
           );
