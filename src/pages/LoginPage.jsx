@@ -4,7 +4,6 @@ import Button from "../components/ui/Button";
 import { login } from "../services/authService";
 import { useAppContext } from "../context/AppContext";
 import { useToast } from "../components/ui/Toaster";
-import Navbar from "../components/layout/Navbar";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");

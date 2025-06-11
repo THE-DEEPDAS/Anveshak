@@ -10,7 +10,7 @@ import { FaEnvelope, FaUpload, FaChartBar } from "react-icons/fa";
 
 const DashboardPage = () => {
   const navigate = useNavigate();
-  const { user, resume, emails, updateResume } = useAppContext();
+  const { user, resume } = useAppContext();
 
   const canShowEmailGenerator = () => {
     return (
