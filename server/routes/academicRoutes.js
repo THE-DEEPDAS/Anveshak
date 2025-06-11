@@ -58,7 +58,7 @@ router.post("/generate-preview-emails", async (req, res) => {
           name: faculty.name,
         })
           .populate("institution")
-          .lean();
+          .lean(); // returns plain js object instead of mongoose document
 
         return dbFaculty || faculty; // Fall back to provided data if not found in DB
       })
@@ -242,6 +242,7 @@ router.post("/generate-preview-emails", async (req, res) => {
         };
 
         const emailContent = await generateBetterEmail(
+          // so we give the LLM the data of only matching faculty and matching skills, projects and experience
           enrichedFaculty,
           enrichedResume
         );
@@ -251,7 +252,7 @@ router.post("/generate-preview-emails", async (req, res) => {
         }
 
         emails.push({
-          preview: true,
+          preview: true, // aa maro flag che ke aa email preview che ke nai te khabar pade
           subject: emailContent.subject,
           content: emailContent.body,
           faculty: {
@@ -297,7 +298,7 @@ router.post("/generate-preview-emails", async (req, res) => {
   }
 });
 
-// Protect all routes
+// Protect all routes are checked for authentication before processing
 router.use(authenticateToken);
 
 // Helper function to wait between email sends
@@ -320,7 +321,7 @@ router.post("/search-and-email", async (req, res) => {
         .json({ message: "Valid domains array is required" });
     }
 
-    // Search for faculty
+    // Search for faculty based on matching domains
     const facultyList = await searchFaculty(domains);
 
     if (!facultyList?.length) {
@@ -486,49 +487,49 @@ router.post("/send-faculty-emails", async (req, res) => {
 });
 
 // Extra findings route
-router.post("/extra-findings", async (req, res) => {
-  try {
-    const { domains } = req.body;
+// router.post("/extra-findings", async (req, res) => {
+//   try {
+//     const { domains } = req.body;
 
-    if (!Array.isArray(domains) || domains.length === 0) {
-      return res
-        .status(400)
-        .json({ message: "Valid domains array is required" });
-    }
+//     if (!Array.isArray(domains) || domains.length === 0) {
+//       return res
+//         .status(400)
+//         .json({ message: "Valid domains array is required" });
+//     }
 
-    // Search for faculty
-    const facultyList = await searchFaculty(domains);
+//     // Search for faculty
+//     const facultyList = await searchFaculty(domains);
 
-    // Filter faculty based on allied interests
-    const alliedInterests = [
-      "robotics",
-      "drones",
-      "UAVs",
-      "control systems",
-      "mechatronics",
-      "AI",
-      "machine learning",
-      "deep learning",
-      "computer vision",
-      "autonomous systems",
-      "embedded systems",
-      "IoT",
-    ];
+//     // Filter faculty based on allied interests
+//     const alliedInterests = [
+//       "robotics",
+//       "drones",
+//       "UAVs",
+//       "control systems",
+//       "mechatronics",
+//       "AI",
+//       "machine learning",
+//       "deep learning",
+//       "computer vision",
+//       "autonomous systems",
+//       "embedded systems",
+//       "IoT",
+//     ];
 
-    const filteredFaculty = facultyList.filter((faculty) =>
-      faculty.researchInterests.some((interest) =>
-        alliedInterests.some((allied) =>
-          interest.toLowerCase().includes(allied.toLowerCase())
-        )
-      )
-    );
+//     const filteredFaculty = facultyList.filter((faculty) =>
+//       faculty.researchInterests.some((interest) =>
+//         alliedInterests.some((allied) =>
+//           interest.toLowerCase().includes(allied.toLowerCase())
+//         )
+//       )
+//     );
 
-    res.status(200).json({ facultyList: filteredFaculty });
-  } catch (error) {
-    console.error("Error getting extra findings:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-});
+//     res.status(200).json({ facultyList: filteredFaculty });
+//   } catch (error) {
+//     console.error("Error getting extra findings:", error);
+//     res.status(500).json({ message: "Server error", error: error.message });
+//   }
+// });
 
 /**
  * Regenerate email for a specific faculty member

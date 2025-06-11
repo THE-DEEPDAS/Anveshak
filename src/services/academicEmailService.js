@@ -31,20 +31,20 @@ export const searchAcademicFaculty = async (domains) => {
   }
 };
 
-export const getExtraFindings = async (domains) => {
-  try {
-    const response = await axios.post(
-      `${API_ENDPOINTS.academic}/extra-findings`,
-      {
-        domains,
-      }
-    );
-    return response.data.facultyList || [];
-  } catch (error) {
-    console.error("Error getting extra findings:", error);
-    throw error;
-  }
-};
+// export const getExtraFindings = async (domains) => {
+//   try {
+//     const response = await axios.post(
+//       `${API_ENDPOINTS.academic}/extra-findings`,
+//       {
+//         domains,
+//       }
+//     );
+//     return response.data.facultyList || [];
+//   } catch (error) {
+//     console.error("Error getting extra findings:", error);
+//     throw error;
+//   }
+// };
 
 export const generatePreviewEmails = async (resumeId, selectedFaculty) => {
   try {

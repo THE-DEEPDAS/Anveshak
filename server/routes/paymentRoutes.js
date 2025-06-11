@@ -113,6 +113,7 @@ router.post("/create-order", authMiddleware, async (req, res) => {
 
     let order;
     try {
+      // Create Razorpay order
       order = await razorpay.orders.create(options);
     } catch (error) {
       throw new Error(

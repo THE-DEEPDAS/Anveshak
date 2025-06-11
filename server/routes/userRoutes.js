@@ -45,6 +45,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Get user by email
+// :email in the URL is extracted and made available in req.params.email
 router.get('/email/:email', async (req, res) => {
   try {
     const user = await User.findOne({ email: req.params.email });
