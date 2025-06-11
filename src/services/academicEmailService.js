@@ -106,6 +106,9 @@ export const regenerateEmail = async (resume, faculty) => {
 
     return response.data.content;
 
+    // agar content thi data nai madto to aa use kari leje
+    // object ni key nu name bhuli gayo chu me etle
+    // backend ma jaine jovu padse ke aa key nu name shu che
     if (!response.data?.email) {
       throw new Error("Failed to regenerate email");
     }

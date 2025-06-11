@@ -39,6 +39,7 @@ export const login = async (credentials) => {
     localStorage.setItem("token", token);
 
     // Set default auth header for future requests
+    // Instead of manually adding the Authorization header to every request, you can set it once globally.
     axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
     return user;

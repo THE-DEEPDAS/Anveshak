@@ -6,6 +6,8 @@ export const uploadResume = async (formData, parseMode = "auto") => {
     // Add parseMode to formData
     formData.append("parseMode", parseMode);
 
+    // ama url, data sivay no 3rd object che config
+    // config ma headers, timeout, maxContentLength, maxBodyLength, onUploadProgress set kari sakay che
     const response = await axios.post(
       `${API_ENDPOINTS.resumes}/upload`,
       formData,
