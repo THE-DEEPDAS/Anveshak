@@ -24,6 +24,7 @@ const companySchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    // normal strings
     description: {
       type: String,
       trim: true,
@@ -37,6 +38,7 @@ const companySchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    // array of strings
     domains: [
       {
         type: String,
@@ -49,6 +51,7 @@ const companySchema = new mongoose.Schema(
         trim: true,
       },
     ],
+    // array of objects
     technologiesUsed: [
       {
         name: {
@@ -75,6 +78,7 @@ const companySchema = new mongoose.Schema(
         },
       },
     ],
+    // nested object
     companyResearch: {
       overview: { type: String, default: "" },
       achievements: { type: [String], default: [] },

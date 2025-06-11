@@ -12,11 +12,6 @@ const validateRazorpayConfig = () => {
     throw new Error('Invalid Razorpay key format');
   }
 
-  // Warn if using live key in development
-  if (isLiveKey && process.env.NODE_ENV !== 'production') {
-    console.warn('⚠️ Warning: Using Razorpay live key in development environment');
-  }
-
   // Warn if using test key in production
   if (isTestKey && process.env.NODE_ENV === 'production') {
     console.warn('⚠️ Warning: Using Razorpay test key in production environment');

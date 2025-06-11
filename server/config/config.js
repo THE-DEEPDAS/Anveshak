@@ -1,7 +1,6 @@
 import dotenv from "dotenv";
 import { fileURLToPath } from "url";
-import { dirname } from "path";
-import path from "path";
+import path, { dirname } from "path";
 import { v2 as cloudinary } from "cloudinary";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -63,8 +62,11 @@ const corsConfig = {
     "Pragma",
     "Expires",
   ],
+  // headers that can be exposed to the browser, allow access matlab
   exposedHeaders: ["Set-Cookie", "Cache-Control", "Pragma", "Expires"],
+  // false means preflight requests will not be sent to next and will be responded immediately
   preflightContinue: false,
+  // status code for successful preflight requests but no response body
   optionsSuccessStatus: 204,
 };
 
@@ -118,8 +120,8 @@ validateConfig();
 // Cookie settings
 const cookieConfig = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+  secure: process.env.NODE_ENV === "development",
+  sameSite: process.env.NODE_ENV === "development" ? "strict" : "lax",
   maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
 };
 
