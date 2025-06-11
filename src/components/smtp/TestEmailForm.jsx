@@ -78,6 +78,7 @@ const TestEmailForm = ({ userProfile }) => {
           <p className={`text-sm font-medium ${testEmailResult.success ? 'text-green-800' : 'text-red-800'}`}>
             {testEmailResult.message}
           </p>
+          {/* only show additional details when not success */}
           {testEmailResult.details && !testEmailResult.success && (
             <p className="mt-1 text-xs text-red-600">
               {testEmailResult.details}
