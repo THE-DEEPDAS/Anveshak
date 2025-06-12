@@ -17,6 +17,7 @@ import { sendEmail } from "../services/emailService.js";
 
 // Helper function to escape special regex characters
 const escapeRegExp = (string) => {
+  // any of the following characters will be escaped
   return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 };
 

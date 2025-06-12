@@ -109,10 +109,6 @@ function extractSkills(text) {
 - Requires well-structured documents
 - May miss context-dependent information
 
-## Advanced Parser
-
-The advanced parser (`advancedResumeParser.js`) provides a more sophisticated approach based on the OpenResume algorithm. It utilizes PDF.js to extract text with positional data, enabling layout understanding.
-
 ### Algorithm
 
 1. **PDF Processing:**

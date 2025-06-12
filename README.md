@@ -127,10 +127,6 @@ async function parseResumeText(pdfBuffer) {
 }
 ```
 
-#### 2. Advanced Parser (advancedResumeParser.js)
-
-A sophisticated parser based on the OpenResume algorithm that provides more accurate and detailed extraction:
-
 **Algorithm Overview:**
 1. Extract text items from PDF with position data using pdf.js
 2. Group text items into lines based on Y-coordinates

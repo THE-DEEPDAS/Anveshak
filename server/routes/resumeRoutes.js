@@ -27,8 +27,10 @@ const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadDir = path.join(__dirname, "../uploads");
     if (!fs.existsSync(uploadDir)) {
+      // parent directory for uploads does not exist, create it
       fs.mkdirSync(uploadDir, { recursive: true });
     }
+    // no error, pass the upload directory to multer
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
@@ -86,10 +88,12 @@ router.post("/upload", authenticateToken, (req, res) => {
 
       // Check if file is actually a PDF (more thorough validation)
       const fileBuffer = fs.readFileSync(req.file.path);
+      // ascii encoding thi string ma "%PDF-" check kariye che
       const isPDF = fileBuffer.toString("ascii", 0, 5) === "%PDF-";
 
       if (!isPDF) {
         // Clean up invalid file
+        // delete a file asynchronously
         fs.unlink(req.file.path, (err) => {
           if (err) console.error("Error deleting invalid file:", err);
         });
